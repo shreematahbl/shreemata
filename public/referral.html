@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Referral Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 650px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.2);
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        .box {
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+
+        .copy-btn {
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .history-box {
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+
+        table th, table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .empty {
+            text-align: center;
+            color: #666;
+            padding: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Referral Dashboard</h2>
+
+    <div class="box">
+        <h3>Your Referral Code</h3>
+        <p id="refCode" style="font-size:20px; font-weight:bold;"></p>
+    </div>
+
+    <div class="box">
+        <h3>Your Referral Link</h3>
+        <input id="refLink" readonly style="width:100%; padding:10px; border-radius:5px;">
+        <button class="copy-btn" onclick="copyLink()">Copy Link</button>
+    </div>
+
+    <div class="box">
+        <h3>Wallet Balance</h3>
+        <p style="font-size:22px; font-weight:bold;">₹ <span id="wallet">0</span></p>
+    </div>
+<a href="referral-tree.html" class="copy-btn">View Referral Tree</a>
+
+
+
+    <div class="history-box box">
+        <h3>Referral History</h3>
+        <table id="refTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Reward</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+        <p id="noHistory" class="empty" style="display:none;">No referrals yet.</p>
+    </div>
+</div>
+
+<script src="js/referral.js"></script>
+
+</body>
+</html>

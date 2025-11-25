@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Referral Tree</title>
+
+<style>
+.tree-card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-top: 30px;
+}
+
+.tree-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.tree-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.tree-search {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    width: 240px;
+}
+
+.tree-node {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    padding: 12px 15px;
+    border-radius: 8px;
+    min-width: 180px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.tree-node:hover {
+    background: #f9fafb;
+}
+
+.tree-name {
+    font-weight: bold;
+    font-size: 16px;
+    color: #131921;
+}
+
+.tree-meta {
+    font-size: 13px;
+    color: #555;
+}
+
+.tree-level {
+    position: relative;
+    padding-top: 20px;
+}
+
+.tree-level::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1px;
+    height: 20px;
+    background: #d1d5db;
+    transform: translateX(-50%);
+}
+
+/* Hide for root */
+.tree-level:first-child::before {
+    display: none;
+}
+
+.tree-children {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    margin-top: 20px;
+    position: relative;
+}
+
+.tree-children::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #d1d5db;
+}
+
+/* Each child vertical line */
+.tree-children > div {
+    position: relative;
+}
+
+.tree-children > div::before {
+    content: "";
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    width: 1px;
+    height: 20px;
+    background: #d1d5db;
+    transform: translateX(-50%);
+}
+
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+    <div class="tree-card">
+
+        <div class="tree-header">
+            <h2 style="color:#131921;">Referral Tree</h2>
+
+            <div class="tree-controls">
+                <input id="searchInput" class="tree-search" placeholder="Search user...">
+                <button id="refreshBtn" class="btn-primary">Refresh</button>
+                <button id="exportBtn" class="btn-secondary">Export PNG</button>
+            </div>
+        </div>
+
+        <p style="color:#666; margin-bottom:10px;">
+            View your full referral network (unlimited levels).
+        </p>
+
+        <div id="treeWrap"></div>
+
+        <div id="loading" style="padding:20px; text-align:center; color:#666;">
+            Loading referral tree…
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+const API = (typeof API_URL !== 'undefined') ? API_URL : '';
+
+document.getElementById('refreshBtn').addEventListener('click', loadTree);
+document.getElementById('exportBtn').addEventListener('click', () => window.print());
+
+async function loadTree(){
+    const wrap = document.getElementById('treeWrap');
+    const loading = document.getElementById('loading');
+    wrap.innerHTML = '';
+    loading.style.display = 'block';
+
+    try{
+        const token = localStorage.getItem('token');
+        if(!token) return window.location.href="/login.html";
+
+        const res = await fetch(API + "/api/referral/tree", {
+            headers: { "Authorization": "Bearer " + token }
+        });
+
+        const data = await res.json();
+
+        loading.style.display = 'none';
+
+        if (!data || !data.root){
+            wrap.innerHTML = "<p>No referral records found.</p>";
+            return;
+        }
+
+        const tree = buildTree(data.root, data.children);
+        wrap.appendChild(tree);
+
+    }catch(err){
+        console.error(err);
+        loading.innerHTML = "Error loading tree.";
+    }
+}
+
+function buildTree(root, children){
+    const container = document.createElement("div");
+    container.className = "tree-level";
+
+    container.appendChild(createUserNode(root));
+
+    if(!children || children.length === 0) return container;
+
+    const childWrap = document.createElement("div");
+    childWrap.className = "tree-children";
+
+    children.forEach(c => {
+        childWrap.appendChild(
+            buildTree(c, c.children || [])
+        );
+    });
+
+    container.appendChild(childWrap);
+    return container;
+}
+
+function createUserNode(user){
+    const node = document.createElement("div");
+    node.className = "tree-node";
+
+    node.innerHTML = `
+        <div class="tree-name">${escapeHtml(user.name)}</div>
+        
+        <div class="tree-meta">Wallet: ₹${Number(user.wallet||0).toFixed(2)}</div>
+        <div class="tree-meta">${user.referrals||0} referrals</div>
+    `;
+    return node;
+}
+
+function escapeHtml(s){
+    return String(s).replace(/[&<>\"']/g, c => (
+        { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+    ));
+}
+
+loadTree();
+</script>
+
+</body>
+</html>

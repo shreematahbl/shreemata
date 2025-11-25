@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Details - BookStore</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="navbar">
+            <div class="container navbar-content">
+                <div class="logo">
+                    <a href="/">📚 BookStore</a>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Search for books, authors...">
+                    <button id="searchBtn">🔍</button>
+                </div>
+
+                <div class="nav-links">
+                    <a href="/" class="active">Home</a>
+
+                    <span id="authLinks">
+                        <a href="/login.html">Login</a>
+                        <a href="/signup.html">Sign Up</a>
+                    </span>
+
+                    <span id="userLinks" style="display:none;">
+                        <span id="userName"></span>
+                        <a href="#" id="logoutBtn">Logout</a>
+                    </span>
+
+                    <a href="/admin.html" id="adminLink" style="display:none;">Admin</a>
+
+                    <!-- CART ICON -->
+                    <a href="/cart.html" id="cartIcon" style="display:none; font-size:18px;">🛒 Cart</a>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div id="loadingSpinner" class="loading">Loading book details...</div>
+
+            <div id="bookDetails" style="display: none;">
+                <div class="book-detail-container">
+
+                    <!-- LEFT SIDE -->
+                    <div class="book-detail-left">
+                        <img id="bookCover" src="" alt="Book Cover" class="book-detail-cover">
+
+                        <!-- 🔥 RAZORPAY CUSTOM BUY BUTTON (Works with your backend) -->
+                        <button id="buyBtn" class="btn-primary btn-large">Buy Now</button>
+
+                        <button id="cartBtn" class="btn-secondary btn-large">Add to Cart</button>
+                    </div>
+
+                    <!-- RIGHT SIDE -->
+                    <div class="book-detail-right">
+                        <h1 id="bookTitle"></h1>
+                        <p class="book-author">by <span id="bookAuthor"></span></p>
+                        <p class="book-price" id="bookPrice"></p>
+
+                        <div class="book-description">
+                            <h3>Description</h3>
+                            <p id="bookDescription"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PREVIEW SECTION -->
+                <div class="preview-section">
+                    <h2>Book Preview</h2>
+                    <p class="preview-note">Preview the first 4 pages of this book</p>
+                    <div id="previewImages" class="preview-grid"></div>
+                    <div id="noPreview" class="empty-state" style="display: none;">
+                        <p>No preview images available for this book.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorState" class="error-state" style="display: none;">
+                <p>Book not found or error loading details.</p>
+                <a href="/" class="btn-secondary">Back to Home</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 BookStore. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script src="js/config.js"></script>
+    <script src="js/global.js"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <script src="js/book.js"></script>
+</body>
+</html>

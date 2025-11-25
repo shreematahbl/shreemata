@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookStore - Home</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="navbar">
+            <div class="container navbar-content">
+                <div class="logo">
+                    <a href="/">📚 BookStore</a>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Search for books, authors...">
+                    <button id="searchBtn">🔍</button>
+                </div>
+                <div class="nav-links">
+                    <a href="/" class="active">Home</a>
+
+                     <span id="authLinks">
+                        <a href="/login.html">Login</a>
+                          <a href="signup.html">Sign Up</a>
+                          
+                     </span>
+
+                     <span id="userLinks" style="display: none;">
+                      <span id="userName"></span>
+                     <a href="#" id="logoutBtn">Logout</a>
+                      </span>
+
+                      <a href="account.html" id="accountLink">Account</a>
+
+<!-- ⭐ NEW Referral Button (visible only if logged in) -->
+<a href="referral.html" id="referralLink" style="display: none;">Referral💰</a>
+
+                         <!-- CART ALWAYS VISIBLE -->
+                         <a href="cart.html" class="cart-icon" id="cartLink">🛒 Cart (<span id="cartCount">0</span>)</a>
+
+                      <a href="admin.html" id="adminLink" style="display: none;">Admin</a>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <section class="hero">
+                <h1>Welcome to BookStore</h1>
+                <p>Discover your next favorite book from our extensive collection</p>
+            </section>
+
+            <section class="books-section">
+                <h2>Featured Books</h2>
+                <div id="loadingSpinner" class="loading">Loading books...</div>
+                <div id="booksGrid" class="books-grid"></div>
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <p>No books available yet. Check back soon!</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 BookStore. All rights reserved.</p>
+        </div>
+    </footer>
+<script src="js/config.js"></script>
+<script src="js/global.js"></script>   <!-- if exists -->
+<script src="js/home.js"></script>     <!-- or page script -->
+
+</body>
+</html>

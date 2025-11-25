@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Cart - BookStore</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>
+    <div class="navbar">
+        <div class="container navbar-content">
+            <div class="logo">
+                <a href="/">📚 BookStore</a>
+            </div>
+
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/cart.html" class="active">Cart</a>
+                <span id="authLinks">
+                    <a href="login.html">Login</a>
+                    <a href="signup.html">Sign Up</a>
+                </span>
+                <span id="userLinks" style="display:none;">
+                    <span id="userName"></span>
+                    <a href="#" id="logoutBtn">Logout</a>
+                </span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+        <h1>Your Cart</h1>
+
+        <div id="cartContainer" class="cart-container"></div>
+
+        <div id="emptyCart" class="empty-state" style="display:none;">
+            <p>Your cart is empty!</p>
+            <a href="/" class="btn-primary">Browse Books</a>
+        </div>
+
+        <div id="cartSummary" class="cart-summary" style="display:none;">
+            <h2>Total: $<span id="cartTotal">0.00</span></h2>
+            <button id="checkoutBtn" class="btn-primary btn-large">Checkout</button>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <div class="container">
+        <p>&copy; 2024 BookStore. All rights reserved.</p>
+    </div>
+</footer>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script src="js/cart.js"></script>
+</body>
+</html>

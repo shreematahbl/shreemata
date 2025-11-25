@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - BookStore</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="navbar">
+            <div class="container navbar-content">
+                <div class="logo">
+                    <a href="/">📚 BookStore</a>
+                </div>
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <span id="userName"></span>
+                    <a href="#" id="logoutBtn">Logout</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="admin-container">
+                <h1>Admin Panel</h1>
+                <p class="admin-subtitle">Manage books in your store</p>
+
+                <button id="viewOrdersBtn" class="btn-secondary">View Orders</button>
+
+
+                <div class="admin-section">
+                    <div class="admin-header">
+                        <h2>Add New Book</h2>
+                        <button id="toggleFormBtn" class="btn-secondary">Show Form</button>
+                    </div>
+
+                    <div id="addBookForm" class="admin-form" style="display: none;">
+                        <form id="bookForm" enctype="multipart/form-data">
+                            <input type="hidden" id="bookId" name="bookId">
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="title">Book Title *</label>
+                                    <input type="text" id="title" name="title" required placeholder="Enter book title">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="author">Author *</label>
+                                    <input type="text" id="author" name="author" required placeholder="Enter author name">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="price">Price ($) *</label>
+                                    <input type="number" id="price" name="price" step="0.01" min="0" required placeholder="0.00">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea id="description" name="description" rows="4" placeholder="Enter book description"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="coverImage">Cover Image</label>
+                                <input type="file" id="coverImage" name="coverImage" accept="image/*">
+                                <small>Upload a cover image for the book</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="previewImages">Preview Images (Max 4 pages)</label>
+                                <input type="file" id="previewImages" name="previewImages[]" accept="image/*" multiple>
+                                <small>Upload up to 4 preview page images</small>
+                            </div>
+
+                            <div id="formErrorMessage" class="error-message" style="display: none;"></div>
+                            <div id="formSuccessMessage" class="success-message" style="display: none;"></div>
+
+                              <div class="form-group">
+    <label for="category">Category *</label>
+    <select id="category" name="category" required>
+      <option value="">Select category</option>
+      <!-- categories will be injected by admin.js -->
+    </select>
+    <small><a id="addCategoryBtn" href="#">+ Add new category</a></small>
+  </div>
+
+                            <div class="form-actions">
+                                
+                                <button type="submit" class="btn-primary" id="submitBtn">Add Book</button>
+                                <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h2>All Books</h2>
+
+<div class="admin-filter-row">
+    <label>Category</label>
+    <select id="adminFilterCategory">
+        <option value="">All</option>
+    </select>
+
+    <label>Search</label>
+    <input type="text" id="adminFilterSearch" placeholder="Search title or author">
+
+    <label>Min</label>
+    <input type="number" id="adminFilterMin" style="width:70px">
+
+    <label>Max</label>
+    <input type="number" id="adminFilterMax" style="width:70px">
+
+    <button id="adminApplyFilter" class="btn-secondary">Apply</button>
+</div>
+
+                    <div id="loadingSpinner" class="loading">Loading books...</div>
+                    <div id="booksTable" style="display: none;">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Cover</th>
+                                    <th>Title</th>
+                                    <th>Author</th>
+                                    <th>Price</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="booksTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="emptyState" class="empty-state" style="display: none;">
+                        <p>No books added yet. Add your first book above!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ===================== ORDERS SECTION ===================== -->
+<div class="container">
+    <div id="ordersSection" class="admin-section" style="display:none; margin-top:40px;">
+        <h2>Customer Orders</h2>
+
+        <div id="ordersLoading" class="loading">Loading orders...</div>
+
+        <table class="admin-table" id="ordersTable" style="display:none;">
+            <thead>
+            <tr>
+                <th>Customer</th>
+                <th>Book Title</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+            </tr>
+            </thead>
+            <tbody id="ordersTableBody"></tbody>
+        </table>
+
+        <div id="ordersEmpty" class="empty-state" style="display:none;">
+            <p>No orders available.</p>
+        </div>
+    </div>
+</div>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 BookStore. All rights reserved.</p>
+        </div>
+    </footer>
+
+<script src="js/config.js"></script>
+<script src="js/global.js"></script>   <!-- if exists -->
+<script src="js/home.js"></script>     <!-- or page script -->
+<script src="js/admin.js"></script>
+</body>
+</html>

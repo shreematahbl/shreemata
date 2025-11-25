@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account - BookStore</title>
+    <link rel="stylesheet" href="css/account.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>
+    <div class="navbar">
+        <div class="container navbar-content">
+            <div class="logo"><a href="/">📚 BookStore</a></div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="cart.html">Cart</a>
+                <a href="#" id="logoutBtn">Logout</a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="container account-container">
+
+        <h1>My Account</h1>
+
+        <div class="account-menu">
+            <button onclick="showSection('profile')">Profile</button>
+            <button onclick="showSection('edit')">Edit Profile</button>
+            <button onclick="showSection('orders')">Order History</button>
+            <button onclick="logout()">Logout</button>
+        </div>
+
+        <div id="profileSection" class="account-section">
+            <h2>Profile</h2>
+            <p><strong>Name:</strong> <span id="accName"></span></p>
+            <p><strong>Email:</strong> <span id="accEmail"></span></p>
+        </div>
+
+        <div id="editSection" class="account-section" style="display:none;">
+            <h2>Edit Profile</h2>
+            <form id="editForm">
+                <input type="text" id="editName" placeholder="New Name">
+                <input type="email" id="editEmail" placeholder="New Email">
+                <button class="btn-primary" type="submit">Update</button>
+            </form>
+        </div>
+
+        <div id="ordersSection" class="account-section" style="display:none;">
+            <h2>Order History</h2>
+            <div id="ordersList">Loading...</div>
+        </div>
+
+    </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/global.js"></script>   <!-- if exists -->
+<script src="js/home.js"></script>     <!-- or page script -->
+<script src="js/account.js"></script>
+</body>
+</html>
