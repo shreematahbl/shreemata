@@ -4,15 +4,38 @@ const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
   password: String,
+
+  // User role (user/admin)
   role: { type: String, default: "user" },
 
-  // 🔥 Referral System Fields
-  referralCode: { type: String, unique: true },     // Code user shares
-  referredBy: { type: String, default: null },       // Code used during signup
-  wallet: { type: Number, default: 0 },              // Reward balance
-  referrals: { type: Number, default: 0 },           // Total successful referrals
-  firstPurchaseDone: { type: Boolean, default: false } // True after 1st order
+  // Delivery Address
+  address: {
+    street: { type: String, default: "" },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    pincode: { type: String, default: "" },
+    phone: { type: String, default: "" }
+  },
 
+  // Referral System
+  referralCode: { type: String, unique: true },    // Code generated for this user
+  referredBy: { type: String, default: null },      // Referral code user applied
+  wallet: { type: Number, default: 0 },             // Referral earnings
+  referrals: { type: Number, default: 0 },          // Number of users referred
+  firstPurchaseDone: { type: Boolean, default: false }, // Locks referral after 1st purchase
+
+  // Withdrawal Requests
+  withdrawals: [
+    {
+      amount: Number,
+      upi: String,
+      bank: String,
+      ifsc: String,
+      status: { type: String, default: "pending" },
+      requestedAt: { type: Date, default: Date.now },
+      approvedAt: Date
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);

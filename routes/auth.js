@@ -41,6 +41,16 @@ router.post("/signup", async (req, res) => {
       firstPurchaseDone: false
     });
 
+    // Increment referrer's referral count
+    if (referredBy) {
+      const referrer = await User.findOne({ referralCode: referredBy });
+      if (referrer) {
+        referrer.referrals += 1;
+        await referrer.save();
+        console.log(`Referral count incremented for ${referrer.email}: ${referrer.referrals}`);
+      }
+    }
+
     const token = jwt.sign(
       { id: newUser._id, email: newUser.email, role: newUser.role },
       process.env.JWT_SECRET,
@@ -125,5 +135,58 @@ router.put("/users/update", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("PROFILE UPDATE ERROR:", err);
     res.status(500).json({ error: "Server error updating profile" });
+  }
+});
+
+// GET USER PROFILE
+router.get("/users/profile", authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user)
+      return res.status(404).json({ error: "User not found" });
+
+    res.json({ user });
+
+  } catch (err) {
+    console.error("GET PROFILE ERROR:", err);
+    res.status(500).json({ error: "Server error fetching profile" });
+  }
+});
+
+// UPDATE DELIVERY ADDRESS
+router.put("/users/update-address", authenticateToken, async (req, res) => {
+  try {
+    const { address } = req.body;
+
+    if (!address || !address.street || !address.city || !address.state || !address.pincode || !address.phone)
+      return res.status(400).json({ error: "All address fields are required" });
+
+    // Validate pincode (6 digits)
+    if (!/^\d{6}$/.test(address.pincode))
+      return res.status(400).json({ error: "Invalid pincode format" });
+
+    // Validate phone (10 digits)
+    if (!/^\d{10}$/.test(address.phone))
+      return res.status(400).json({ error: "Invalid phone number format" });
+
+    const user = await User.findById(req.user.id);
+    if (!user)
+      return res.status(404).json({ error: "User not found" });
+
+    user.address = {
+      street: address.street,
+      city: address.city,
+      state: address.state,
+      pincode: address.pincode,
+      phone: address.phone
+    };
+
+    await user.save();
+
+    res.json({ message: "Address updated successfully", user });
+
+  } catch (err) {
+    console.error("ADDRESS UPDATE ERROR:", err);
+    res.status(500).json({ error: "Server error updating address" });
   }
 });

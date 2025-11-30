@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const { authenticateToken } = require("../middleware/auth");
+const { sendOrderConfirmationEmail, sendAdminNotification } = require("../utils/emailService");
 
 const router = express.Router();
 
@@ -14,123 +15,211 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-// Reward sequence (0-based index = current referrer.referrals count)
-const rewardSequence = [10, 8, 6, 4, 3, 1, 0.5, 0.5, 0.5];
-
-// Helper to apply referral reward safely (idempotent)
-async function applyReferralRewardForOrder(order) {
-    if (!order) return { applied: false, reason: "no-order" };
-
-    // Avoid double applying
-    if (order.rewardApplied) {
-        return { applied: false, reason: "already-rewarded" };
-    }
-
-    // The buyer
-    const buyer = await User.findById(order.user_id);
-    if (!buyer) return { applied: false, reason: "buyer-not-found" };
-
-    // Only first purchase reward
-    if (!buyer.referredBy || buyer.firstPurchaseDone) {
-        return { applied: false, reason: "not-eligible" };
-    }
-
-    // Reward table (level 1 → highest reward)
-    const rewardSequence = [10, 8, 6, 4, 3, 1, 0.5, 0.5, 0.5];
-
-    // Start with LEVEL 1
-    let currentReferralCode = buyer.referredBy;
-    let level = 0;
-    let results = [];
-
-    while (currentReferralCode) {
-        // Find the referrer of this level
-        const referrer = await User.findOne({ referralCode: currentReferralCode });
-        if (!referrer) break;
-
-        // Determine reward
-        const reward = rewardSequence[level] ?? 0.5;
-
-        // Add reward to this referrer's wallet
-        referrer.wallet = Number(referrer.wallet || 0) + reward;
-        referrer.referrals = Number(referrer.referrals || 0) + 1;
-        await referrer.save();
-
-        // Push to result log
-        results.push({
-            level: level + 1,
-            reward,
-            referrerId: referrer._id
-        });
-
-        // Next level → referrer of current referrer
-        currentReferralCode = referrer.referredBy;
-        level++;
-
-        // Safety break to avoid infinite loops
-        if (level > 50) break;
-    }
-
-    // Mark buyer as first purchase complete
-    buyer.firstPurchaseDone = true;
-    await buyer.save();
-
-    // Mark order reward applied
-    order.rewardApplied = true;
-    await order.save();
-
-    return { applied: true, chain: results };
+/**
+ * Generate 7% multi-level distribution:
+ * 3 → 1.5 → 0.75 → 0.375 → ...
+ */
+function getReferralPercentages(levels = 10) {
+  const arr = [];
+  let percent = 3; // Level 1 gets 3%
+  for (let i = 0; i < levels; i++) {
+    arr.push(percent);
+    percent = percent / 2;
+  }
+  return arr;
 }
 
-// ===============================================
+/**
+ * Apply referral commission
+ * NOTE: This function should only be called AFTER atomic update has marked rewardApplied=true
+ * The duplicate prevention is handled at the database level, not here
+ */
+async function applyReferralRewardForOrder(order) {
+  if (!order) return { applied: false, reason: "no-order" };
+
+  const buyer = await User.findById(order.user_id);
+  if (!buyer) return { applied: false, reason: "buyer-not-found" };
+
+  // Must have been referred
+  if (!buyer.referredBy) {
+    return { applied: false, reason: "no-referrer" };
+  }
+
+  const totalAmount = order.totalAmount;
+  const ADMIN_PERCENT = 3; // Admin gets 3%
+  const REFERRAL_LEVELS = getReferralPercentages(10); // Referral chain gets 6% (3+1.5+0.75+...)
+
+  console.log("=== Referral Reward Calculation ===");
+  console.log("Order Total Amount (after discount):", totalAmount);
+  if (order.appliedOffer) {
+    console.log("Offer Applied:", order.appliedOffer.offerTitle);
+    console.log("Original Amount:", order.appliedOffer.originalAmount);
+    console.log("Discounted Amount:", order.appliedOffer.discountedAmount);
+    console.log("Savings:", order.appliedOffer.savings);
+    console.log("✅ Referral rewards will be calculated on:", totalAmount, "(discounted amount)");
+  } else {
+    console.log("No offer applied. Referral rewards on full amount:", totalAmount);
+  }
+
+  let results = [];
+
+  // ---------------------------------------
+  // A: Admin Commission (3%)
+  // ---------------------------------------
+  const admin = await User.findOne({ role: "admin" });
+  if (admin) {
+    const adminAmount = (totalAmount * ADMIN_PERCENT) / 100;
+    admin.wallet += adminAmount;
+    await admin.save();
+
+    results.push({
+      type: "admin",
+      percent: ADMIN_PERCENT,
+      amount: adminAmount,
+      userId: admin._id
+    });
+  }
+
+  // ---------------------------------------
+  // B: Referral Chain Commission (7%)
+  // ---------------------------------------
+  let parent = await User.findOne({ referralCode: buyer.referredBy });
+  let level = 0;
+
+  while (parent && level < REFERRAL_LEVELS.length) {
+    const percent = REFERRAL_LEVELS[level];
+    const amount = (totalAmount * percent) / 100;
+
+    parent.wallet += amount;
+    await parent.save();
+
+    results.push({
+      type: "referral",
+      level: level + 1,
+      percent,
+      amount,
+      userId: parent._id
+    });
+
+    // next in chain
+    parent = await User.findOne({ referralCode: parent.referredBy });
+    level++;
+  }
+
+  // Lock referral after FIRST purchase
+  if (!buyer.firstPurchaseDone) {
+    buyer.firstPurchaseDone = true;
+    await buyer.save();
+  }
+
+  // Note: rewardApplied is already set to true by the atomic update
+  // No need to save again here
+  
+  console.log(`✅ Rewards applied for order ${order._id}`);
+
+  return { applied: true, chain: results };
+}
+
+// =====================================================
 // 1️⃣ CREATE RAZORPAY ORDER
-// ===============================================
+// =====================================================
 router.post("/create-order", authenticateToken, async (req, res) => {
   try {
-    const { amount, items } = req.body;
-    if (!amount) return res.status(400).json({ error: "Amount missing" });
+    const { amount, items, deliveryAddress, appliedOffer } = req.body;
+
+    console.log("Create order request:", { amount, itemsCount: items?.length, hasAddress: !!deliveryAddress, hasOffer: !!appliedOffer });
+    console.log("Items type:", typeof items, "Is array:", Array.isArray(items));
+    
+    // Ensure items is an array
+    if (!Array.isArray(items)) {
+      console.error("Items is not an array:", items);
+      return res.status(400).json({ error: "Items must be an array" });
+    }
 
     const options = {
-      amount: Math.round(amount * 100), // convert to paise
+      amount: Math.round(amount * 100),
       currency: "INR",
       receipt: "order_" + Date.now()
     };
 
-    const order = await razorpay.orders.create(options);
+    const razorpayOrder = await razorpay.orders.create(options);
+    console.log("Razorpay order created:", razorpayOrder.id);
+
+    // Prepare delivery address with defaults
+    const addressData = deliveryAddress ? {
+      street: deliveryAddress.street || "",
+      city: deliveryAddress.city || "",
+      state: deliveryAddress.state || "",
+      pincode: deliveryAddress.pincode || "",
+      phone: deliveryAddress.phone || ""
+    } : undefined;
+
+    // Prepare items array properly
+    const orderItems = items.map(item => ({
+      id: item.id,
+      title: item.title,
+      author: item.author,
+      price: Number(item.price),
+      quantity: Number(item.quantity),
+      coverImage: item.coverImage,
+      type: item.type || 'book'
+    }));
+
+    console.log("Prepared order items:", orderItems);
+
+    // Prepare offer data if applicable
+    const offerData = appliedOffer ? {
+      offerId: appliedOffer.offerId,
+      offerTitle: appliedOffer.offerTitle,
+      discountType: appliedOffer.discountType,
+      discountValue: appliedOffer.discountValue,
+      originalAmount: appliedOffer.originalAmount,
+      discountedAmount: appliedOffer.discountedAmount,
+      savings: appliedOffer.savings
+    } : undefined;
+
+    if (offerData) {
+      console.log("Applied offer:", offerData);
+    }
 
     const dbOrder = await Order.create({
       user_id: req.user.id,
-      items: items || [],
+      items: orderItems,
       totalAmount: amount,
+      appliedOffer: offerData,
+      deliveryAddress: addressData,
       status: "pending",
       rewardApplied: false,
-      razorpay_order_id: order.id
+      razorpay_order_id: razorpayOrder.id
     });
 
-    res.json({ order, dbOrder });
+    console.log("DB order created:", dbOrder._id);
 
+    res.json({ order: razorpayOrder, dbOrder });
   } catch (err) {
-    console.error("Create-order error:", err);
-    res.status(500).json({ error: "Error creating order" });
+    console.error("Create order error:", err);
+    console.error("Error details:", err.message);
+    res.status(500).json({ error: "Unable to create Razorpay order", details: err.message });
   }
 });
 
-// ===============================================
-// 2️⃣ VERIFY PAYMENT (Called by frontend after success)
-//    This route verifies signature, updates order, and applies referral reward.
-// ===============================================
+// =====================================================
+// 2️⃣ VERIFY PAYMENT
+// =====================================================
 router.post("/verify", authenticateToken, async (req, res) => {
+  console.log("\n🔍 ===== PAYMENT VERIFICATION STARTED =====");
+  console.log("   Razorpay Order ID:", req.body.razorpay_order_id);
+  console.log("   Razorpay Payment ID:", req.body.razorpay_payment_id);
+  
   try {
     const {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
+      totalAmount,
       items,
-      totalAmount
+      deliveryAddress
     } = req.body;
-
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
-      return res.status(400).json({ error: "Missing payment fields" });
 
     // Signature check
     const expected = crypto
@@ -139,114 +228,172 @@ router.post("/verify", authenticateToken, async (req, res) => {
       .digest("hex");
 
     if (expected !== razorpay_signature) {
-      console.warn("Verify: invalid signature", { razorpay_order_id, razorpay_payment_id });
       return res.status(400).json({ error: "Invalid signature" });
     }
 
-    // Update order to completed
-    const updatedOrder = await Order.findOneAndUpdate(
-      { razorpay_order_id },
+    // ATOMIC UPDATE: Find order and mark as processing in one operation
+    // This prevents race condition between verify and webhook
+    const order = await Order.findOneAndUpdate(
+      { 
+        razorpay_order_id,
+        rewardApplied: false  // Only update if not already processed
+      },
       {
         status: "completed",
         razorpay_payment_id,
         items,
-        totalAmount
+        totalAmount,
+        deliveryAddress: deliveryAddress || {},
+        rewardApplied: true  // Mark immediately to prevent duplicate
       },
       { new: true }
     );
 
-    if (!updatedOrder) {
-      console.warn("Verify: order not found for razorpay_order_id", razorpay_order_id);
+    if (!order) {
+      // Either order not found OR already processed
+      const existingOrder = await Order.findOne({ razorpay_order_id });
+      if (existingOrder && existingOrder.rewardApplied) {
+        console.log("⚠️ Verify: Rewards already applied, skipping");
+        return res.json({ message: "Payment already processed", order: existingOrder });
+      }
       return res.status(404).json({ error: "Order not found" });
     }
 
-    // Attempt to apply referral reward (idempotent)
-    try {
-      const result = await applyReferralRewardForOrder(updatedOrder);
-      if (result.applied) {
-        console.log("Verify: referral reward applied:", result);
+    console.log("✅ Verify: Order marked as processed, applying rewards...");
+
+    // APPLY REFERRAL SYSTEM (order already marked as rewardApplied)
+    const result = await applyReferralRewardForOrder(order);
+    console.log("Referral Result:", result);
+
+    // SEND EMAIL NOTIFICATIONS - ALWAYS EXECUTE
+    console.log("\n🔍 ===== EMAIL NOTIFICATION PROCESS STARTED =====");
+    
+    // Fetch user
+    console.log("🔍 Fetching user for order:", order.user_id);
+    const user = await User.findById(order.user_id);
+    
+    if (!user) {
+      console.error("❌ CRITICAL: User not found for order:", order.user_id);
+      console.log("🔍 ===== EMAIL NOTIFICATION PROCESS ENDED (NO USER) =====\n");
+    } else {
+      console.log("✅ User found:", user.name);
+      console.log("   User email:", user.email || "❌ NO EMAIL SET");
+      
+      if (!user.email) {
+        console.error("❌ CRITICAL: User has no email address!");
+        console.log("🔍 ===== EMAIL NOTIFICATION PROCESS ENDED (NO EMAIL) =====\n");
       } else {
-        console.log("Verify: referral not applied:", result);
+        // Send customer confirmation email
+        console.log("\n📧 Attempting to send order confirmation email...");
+        console.log("   To:", user.email);
+        console.log("   Order ID:", order._id);
+        
+        try {
+          const customerEmail = await sendOrderConfirmationEmail(order, user);
+          if (customerEmail.success) {
+            console.log("✅ SUCCESS: Customer email sent!");
+            console.log("   Message ID:", customerEmail.messageId);
+          } else {
+            console.error("❌ FAILED: Customer email not sent");
+            console.error("   Error:", customerEmail.error);
+          }
+        } catch (emailError) {
+          console.error("❌ EXCEPTION: Error sending customer email");
+          console.error("   Error:", emailError.message);
+          console.error("   Stack:", emailError.stack);
+        }
+
+        // Send admin notification email
+        console.log("\n📧 Attempting to send admin notification...");
+        console.log("   To:", process.env.MAIL_USER);
+        
+        try {
+          const adminEmail = await sendAdminNotification(order, user);
+          if (adminEmail.success) {
+            console.log("✅ SUCCESS: Admin notification sent!");
+            console.log("   Message ID:", adminEmail.messageId);
+          } else {
+            console.error("❌ FAILED: Admin notification not sent");
+            console.error("   Error:", adminEmail.error);
+          }
+        } catch (emailError) {
+          console.error("❌ EXCEPTION: Error sending admin notification");
+          console.error("   Error:", emailError.message);
+          console.error("   Stack:", emailError.stack);
+        }
+        
+        console.log("\n🔍 ===== EMAIL NOTIFICATION PROCESS COMPLETED =====\n");
       }
-    } catch (e) {
-      console.error("Verify: error applying referral reward", e);
-      // don't block success response; reward can be applied by webhook if needed
     }
 
-    res.json({
-      message: "Payment verified & order updated",
-      order: updatedOrder
-    });
+    res.json({ message: "Payment verified", order });
 
   } catch (err) {
     console.error("Verify error:", err);
-    res.status(500).json({ error: "Server error verifying payment" });
+    res.status(500).json({ error: "Error verifying payment" });
   }
 });
 
-// ===============================================
-// 3️⃣ WEBHOOK (Razorpay server -> your /api/payments/webhook endpoint)
-//    NOTE: server.js routes raw body to POST /api/payments/webhook
-//    Here we handle signature and ensure referral reward (also idempotent).
-// ===============================================
+// =====================================================
+// 3️⃣ WEBHOOK (backup referral application)
+// =====================================================
 router.post("/webhook", async (req, res) => {
   try {
-    // IMPORTANT: server.js should mount the raw body for /api/payments/webhook BEFORE express.json()
-    // and forward the raw body here as req.body (Buffer/string). If you used the pattern that sets req.isWebhook,
-    // you can access raw body via req.body (string/Buffer). Adjust if needed.
-    const rawBody = req.body; // this should be raw string/body
+    const rawBody = req.body;
+    const signature = req.headers["x-razorpay-signature"];
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    // Compute signature using raw body string
     const expected = crypto
       .createHmac("sha256", secret)
       .update(rawBody)
       .digest("hex");
 
-    const signature = req.headers["x-razorpay-signature"];
-
     if (expected !== signature) {
-      console.warn("Webhook: invalid signature");
       return res.status(400).send("Invalid signature");
     }
 
-    // Parse payload (rawBody is a Buffer or string)
-    const payload = typeof rawBody === "string" ? JSON.parse(rawBody) : JSON.parse(rawBody.toString());
-    const event = payload.event;
-    const payment = payload.payload?.payment?.entity;
+    const data = JSON.parse(rawBody);
+    const event = data.event;
 
-    console.log("Webhook event:", event);
-
-    if (!payment) {
+    if (!data.payload?.payment?.entity) {
       return res.send("OK");
     }
 
-    // If payment captured, mark order completed and attempt reward
-    if (event === "payment.captured" || event === "payment.authorized") {
-      const razorpayOrderId = payment.order_id;
+    const payment = data.payload.payment.entity;
 
-      const updatedOrder = await Order.findOneAndUpdate(
-        { razorpay_order_id: razorpayOrderId },
+    if (event === "payment.captured") {
+      // ATOMIC UPDATE: Only process if not already done
+      const order = await Order.findOneAndUpdate(
+        { 
+          razorpay_order_id: payment.order_id,
+          rewardApplied: false  // Only update if not already processed
+        },
         {
           status: "completed",
-          razorpay_payment_id: payment.id
+          razorpay_payment_id: payment.id,
+          rewardApplied: true  // Mark immediately
         },
         { new: true }
       );
 
-      if (updatedOrder) {
+      if (order) {
+        console.log("✅ Webhook: Order marked as processed, applying rewards...");
+        await applyReferralRewardForOrder(order);
+        
+        // Send email notification from webhook as backup
+        console.log("🔍 Webhook: Sending email notification...");
         try {
-          const result = await applyReferralRewardForOrder(updatedOrder);
-          if (result.applied) {
-            console.log("Webhook: referral reward applied:", result);
-          } else {
-            console.log("Webhook: referral not applied:", result);
+          const user = await User.findById(order.user_id);
+          if (user && user.email) {
+            await sendOrderConfirmationEmail(order, user);
+            await sendAdminNotification(order, user);
+            console.log("✅ Webhook: Email notifications sent");
           }
-        } catch (e) {
-          console.error("Webhook: error applying referral reward", e);
+        } catch (emailError) {
+          console.error("❌ Webhook: Email error:", emailError.message);
         }
       } else {
-        console.warn("Webhook: order not found for razorpay_order_id", razorpayOrderId);
+        console.log("⚠️ Webhook: Order already processed or not found, skipping");
       }
     }
 

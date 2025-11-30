@@ -30,6 +30,7 @@
         <div class="account-menu">
             <button onclick="showSection('profile')">Profile</button>
             <button onclick="showSection('edit')">Edit Profile</button>
+            <button onclick="showSection('address')">Delivery Address</button>
             <button onclick="showSection('orders')">Order History</button>
             <button onclick="logout()">Logout</button>
         </div>
@@ -49,6 +50,30 @@
             </form>
         </div>
 
+        <div id="addressSection" class="account-section" style="display:none;">
+            <h2>Delivery Address</h2>
+            <div id="addressDisplay" style="margin-bottom: 20px;">
+                <p><strong>Street Address:</strong> <span id="displayStreet">Not set</span></p>
+                <p><strong>City:</strong> <span id="displayCity">Not set</span></p>
+                <p><strong>State:</strong> <span id="displayState">Not set</span></p>
+                <p><strong>Pincode:</strong> <span id="displayPincode">Not set</span></p>
+                <p><strong>Phone:</strong> <span id="displayPhone">Not set</span></p>
+            </div>
+            <button class="btn-primary" onclick="toggleAddressEdit()">Edit Address</button>
+            
+            <form id="addressForm" style="display:none; margin-top: 20px;">
+                <input type="text" id="street" placeholder="Street Address" required>
+                <input type="text" id="city" placeholder="City" required>
+                <input type="text" id="state" placeholder="State" required>
+                <input type="text" id="pincode" placeholder="Pincode" required pattern="[0-9]{6}">
+                <input type="tel" id="phone" placeholder="Phone Number" required pattern="[0-9]{10}">
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" type="submit">Save Address</button>
+                    <button class="btn-secondary" type="button" onclick="toggleAddressEdit()">Cancel</button>
+                </div>
+            </form>
+        </div>
+
         <div id="ordersSection" class="account-section" style="display:none;">
             <h2>Order History</h2>
             <div id="ordersList">Loading...</div>
@@ -58,8 +83,6 @@
 </main>
 
 <script src="js/config.js"></script>
-<script src="js/global.js"></script>   <!-- if exists -->
-<script src="js/home.js"></script>     <!-- or page script -->
 <script src="js/account.js"></script>
 </body>
 </html>

@@ -76,11 +76,6 @@ function setupEventListeners() {
     document.getElementById('bookForm').addEventListener('submit', handleFormSubmit);
     document.getElementById('cancelBtn').addEventListener('click', resetForm);
 
-    document.getElementById("viewOrdersBtn").addEventListener("click", () => {
-        document.getElementById("ordersSection").style.display = "block";
-        loadOrders();
-    });
-
     document.getElementById('previewImages').addEventListener('change', (e) => {
         if (e.target.files.length > 4) {
             alert('Maximum 4 preview images allowed');
@@ -151,23 +146,52 @@ async function loadBooks(filters = {}) {
 /* DISPLAY BOOKS */
 function displayBooks(books) {
     const tbody = document.getElementById('booksTableBody');
+    const mobileContainer = document.getElementById('mobileBooksContainer');
     tbody.innerHTML = '';
+    mobileContainer.innerHTML = '';
 
     books.forEach(book => {
+        // Desktop table row
         const row = document.createElement('tr');
-
         row.innerHTML = `
             <td><img src="${book.cover_image}" width="50"/></td>
             <td>${book.title}</td>
             <td>${book.author}</td>
-            <td>$${parseFloat(book.price).toFixed(2)}</td>
+            <td>₹${parseFloat(book.price).toFixed(2)}</td>
             <td>
                 <button class="btn-secondary edit-btn" data-id="${book._id}">Edit</button>
                 <button class="btn-danger delete-btn" data-id="${book._id}">Delete</button>
             </td>
         `;
-
         tbody.appendChild(row);
+
+        // Mobile card
+        const card = document.createElement('div');
+        card.className = 'mobile-book-card';
+        card.innerHTML = `
+            <div class="mobile-book-header">
+                <img src="${book.cover_image}" class="mobile-book-cover" alt="${book.title}">
+                <div class="mobile-book-info">
+                    <h3>${book.title}</h3>
+                    <p><strong>Author:</strong> ${book.author}</p>
+                    <p><strong>Category:</strong> ${book.category || 'N/A'}</p>
+                    <div class="mobile-book-price">₹${parseFloat(book.price).toFixed(2)}</div>
+                </div>
+            </div>
+            <div class="mobile-book-actions">
+                <button class="btn btn-secondary edit-btn" data-id="${book._id}">✏️ Edit</button>
+                <button class="btn btn-danger delete-btn" data-id="${book._id}">🗑️ Delete</button>
+            </div>
+        `;
+        mobileContainer.appendChild(card);
+    });
+
+    // Add event listeners for mobile cards
+    mobileContainer.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editBook(btn.dataset.id));
+    });
+    mobileContainer.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteBook(btn.dataset.id));
     });
 }
 
@@ -270,72 +294,3 @@ async function loadCategoriesForAdminFilters() {
         select.appendChild(opt);
     });
 }
-
-/* LOAD ORDERS */
-async function loadOrders() {
-    const token = localStorage.getItem("token");
-
-    document.getElementById("ordersLoading").style.display = "block";
-    document.getElementById("ordersTable").style.display = "none";
-    document.getElementById("ordersEmpty").style.display = "none";
-
-    const res = await fetch(`${API}/orders/admin/all`, {
-        headers: { "Authorization": "Bearer " + token }
-    });
-
-    const data = await res.json();
-    const tbody = document.getElementById("ordersTableBody");
-    tbody.innerHTML = "";
-
-    document.getElementById("ordersLoading").style.display = "none";
-
-    if (!data.orders || data.orders.length === 0) {
-        document.getElementById("ordersEmpty").style.display = "block";
-        return;
-    }
-
-    document.getElementById("ordersTable").style.display = "table";
-
-    data.orders.forEach(order => {
-        const tr = document.createElement("tr");
-
-        tr.innerHTML = `
-            <td>
-                ${order.user_id?.name || "Unknown"}<br>
-                <small>${order.user_id?.email || ""}</small>
-            </td>
-            <td>${order.items[0].title}</td>
-            <td>$${order.totalAmount}</td>
-            <td>${order.status}</td>
-            <td>${new Date(order.createdAt).toLocaleString()}</td>
-        `;
-
-        tbody.appendChild(tr);
-    });
-}
-
-document.querySelectorAll(".updateStatusBtn").forEach(btn => {
-    btn.addEventListener("click", async function() {
-        const orderId = this.dataset.id;
-        const newStatus = document.querySelector(`.statusSelect[data-id="${orderId}"]`).value;
-
-        const token = localStorage.getItem("token");
-
-        const res = await fetch(`${API_URL}/orders/admin/update-status/${orderId}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + token
-            },
-            body: JSON.stringify({ status: newStatus })
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-            alert("Order status updated");
-        } else {
-            alert("Error updating order");
-        }
-    });
-});

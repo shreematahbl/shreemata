@@ -5,36 +5,457 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - BookStore</title>
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            background: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        nav {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        nav h1 {
+            color: white;
+            margin: 0;
+            font-size: 24px;
+        }
+        nav div {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        nav a:hover, nav a.active {
+            background: rgba(255,255,255,0.2);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .main-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 100px;
+        }
+        .admin-section {
+            margin: 30px 0;
+        }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .admin-header h2 {
+            margin: 0;
+            color: #333;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+        }
+        .btn-secondary:hover {
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+        .admin-form {
+            background: #f9f9f9;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid #e0e0e0;
+            margin-top: 20px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        .form-group small a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .form-group small a:hover {
+            text-decoration: underline;
+        }
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .admin-filter-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        .admin-filter-row label {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+        .admin-filter-row input, .admin-filter-row select {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .admin-filter-row input:focus, .admin-filter-row select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .admin-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .admin-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .admin-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .admin-table tbody tr:hover {
+            background: #f9f9f9;
+        }
+        .admin-table img {
+            width: 60px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .admin-table button {
+            padding: 6px 12px;
+            margin: 0 3px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .admin-table button:hover {
+            transform: translateY(-1px);
+        }
+        .edit-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #c62828;
+        }
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #2e7d32;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 16px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+        footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            margin-top: 60px;
+        }
+
+        /* Mobile Books Card Layout */
+        .mobile-books {
+            display: none;
+        }
+        
+        .mobile-book-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .mobile-book-header {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .mobile-book-cover {
+            width: 80px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        
+        .mobile-book-info {
+            flex: 1;
+        }
+        
+        .mobile-book-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .mobile-book-info p {
+            margin: 3px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .mobile-book-price {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 8px;
+        }
+        
+        .mobile-book-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .mobile-book-actions button {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            nav .container {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            nav h1 {
+                font-size: 20px;
+            }
+            
+            nav div {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            nav a {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .main-container {
+                padding: 15px;
+                margin-top: 160px;
+            }
+            
+            .admin-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch !important;
+            }
+            
+            .admin-header h2 {
+                font-size: 18px;
+            }
+            
+            .btn {
+                width: 100%;
+                padding: 10px 20px;
+            }
+            
+            /* Hide table on mobile, show cards */
+            .admin-table {
+                display: none !important;
+            }
+            
+            .mobile-books {
+                display: block !important;
+            }
+            
+            .admin-filter-row {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            
+            .admin-filter-row input,
+            .admin-filter-row select {
+                width: 100%;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr !important;
+            }
+            
+            /* Modal adjustments */
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+                margin: 20px auto;
+            }
+            
+            .modal-content h2 {
+                font-size: 18px;
+            }
+            
+            .form-group input,
+            .form-group textarea,
+            .form-group select {
+                font-size: 16px !important; /* Prevents zoom on iOS */
+            }
+            
+            .modal-content form > div:last-child {
+                flex-direction: column !important;
+            }
+            
+            .modal-content form > div:last-child button {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <div class="navbar">
-            <div class="container navbar-content">
-                <div class="logo">
-                    <a href="/">📚 BookStore</a>
-                </div>
-                <div class="nav-links">
-                    <a href="/">Home</a>
-                    <span id="userName"></span>
-                    <a href="#" id="logoutBtn">Logout</a>
-                </div>
+    <nav>
+        <div class="container">
+            <h1>📚 BookStore Admin</h1>
+            <div>
+                <span id="userName" style="color: white; margin-right: 10px;"></span>
+                <a href="/">🏠 Home</a>
+                <a href="/admin.html" class="active">Books</a>
+                <a href="/admin-bundles.html">Bundles</a>
+                <a href="/admin-orders.html">Orders</a>
+                <a href="/admin-withdrawals.html">Withdrawals</a>
+                <a href="/admin-notifications.html">Notifications</a>
+                <a href="/" id="logoutBtn">Logout</a>
             </div>
         </div>
-    </header>
+    </nav>
 
     <main>
         <div class="container">
-            <div class="admin-container">
-                <h1>Admin Panel</h1>
-                <p class="admin-subtitle">Manage books in your store</p>
-
-                <button id="viewOrdersBtn" class="btn-secondary">View Orders</button>
-
+            <div class="main-container">
+                <div style="margin-bottom: 30px;">
+                    <h1 style="margin: 0 0 5px 0;">Manage Books</h1>
+                    <p style="color: #666; margin: 0;">Add, edit, and manage your book inventory</p>
+                </div>
 
                 <div class="admin-section">
                     <div class="admin-header">
                         <h2>Add New Book</h2>
-                        <button id="toggleFormBtn" class="btn-secondary">Show Form</button>
+                        <button id="toggleFormBtn" class="btn">Show Form</button>
                     </div>
 
                     <div id="addBookForm" class="admin-form" style="display: none;">
@@ -90,8 +511,7 @@
   </div>
 
                             <div class="form-actions">
-                                
-                                <button type="submit" class="btn-primary" id="submitBtn">Add Book</button>
+                                <button type="submit" class="btn" id="submitBtn">Add Book</button>
                                 <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
                             </div>
                         </form>
@@ -116,7 +536,7 @@
     <label>Max</label>
     <input type="number" id="adminFilterMax" style="width:70px">
 
-    <button id="adminApplyFilter" class="btn-secondary">Apply</button>
+    <button id="adminApplyFilter" class="btn">Apply</button>
 </div>
 
                     <div id="loadingSpinner" class="loading">Loading books...</div>
@@ -134,37 +554,13 @@
                             <tbody id="booksTableBody"></tbody>
                         </table>
                     </div>
+                    <div class="mobile-books" id="mobileBooksContainer"></div>
                     <div id="emptyState" class="empty-state" style="display: none;">
                         <p>No books added yet. Add your first book above!</p>
                     </div>
                 </div>
             </div>
         </div>
-        <!-- ===================== ORDERS SECTION ===================== -->
-<div class="container">
-    <div id="ordersSection" class="admin-section" style="display:none; margin-top:40px;">
-        <h2>Customer Orders</h2>
-
-        <div id="ordersLoading" class="loading">Loading orders...</div>
-
-        <table class="admin-table" id="ordersTable" style="display:none;">
-            <thead>
-            <tr>
-                <th>Customer</th>
-                <th>Book Title</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Date</th>
-            </tr>
-            </thead>
-            <tbody id="ordersTableBody"></tbody>
-        </table>
-
-        <div id="ordersEmpty" class="empty-state" style="display:none;">
-            <p>No orders available.</p>
-        </div>
-    </div>
-</div>
 
     </main>
 
@@ -175,8 +571,6 @@
     </footer>
 
 <script src="js/config.js"></script>
-<script src="js/global.js"></script>   <!-- if exists -->
-<script src="js/home.js"></script>     <!-- or page script -->
 <script src="js/admin.js"></script>
 </body>
 </html>

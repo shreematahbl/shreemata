@@ -12,6 +12,8 @@ if (!API_URL || API_URL === "undefined") {
 document.addEventListener('DOMContentLoaded', () => {
     console.log("HOME USING API:", API_URL);
     checkAuth();
+    loadNotifications(); // Load notifications/offers
+    loadBundles(); // Load combo offers
     loadCategoriesForFilter();
     loadBooksWithFilters();
     setupEventListeners();
@@ -63,6 +65,38 @@ async function loadCategoriesForFilter() {
 }
 
 /* ------------------------------
+   LOAD NOTIFICATIONS
+--------------------------------*/
+async function loadNotifications() {
+    try {
+        const res = await fetch(`${API_URL}/notifications`);
+        const data = await res.json();
+
+        if (data.notifications && data.notifications.length > 0) {
+            displayNotifications(data.notifications);
+        }
+    } catch (err) {
+        console.error("Error loading notifications:", err);
+    }
+}
+
+function displayNotifications(notifications) {
+    const section = document.getElementById('notificationsSection');
+    
+    section.innerHTML = notifications.map(notif => `
+        <div class="notification-banner ${notif.type}">
+            <div class="notification-header">
+                <div class="notification-title">📢 ${notif.title}</div>
+                <span class="notification-type-badge badge-${notif.type}">${notif.type}</span>
+            </div>
+            <div class="notification-message">${notif.message}</div>
+        </div>
+    `).join('');
+    
+    section.style.display = 'block';
+}
+
+/* ------------------------------
    LOAD BOOKS WITH FILTERS
 --------------------------------*/
 async function loadBooksWithFilters({ page = 1, limit = 12, category, minPrice, maxPrice, search } = {}) {
@@ -105,13 +139,23 @@ function checkAuth() {
     const user = JSON.parse(localStorage.getItem("user") || "null");
 
     if (token && user) {
-        document.getElementById("authLinks").style.display = "none";
-        document.getElementById("userLinks").style.display = "flex";
-        document.getElementById("userName").textContent = `Hello, ${user.name}`;
-        document.getElementById("accountLink").style.display = "block";
+        const authLinks = document.getElementById("authLinks");
+        const userLinks = document.getElementById("userLinks");
+        const userName = document.getElementById("userName");
+        const accountLink = document.getElementById("accountLink");
+        const ordersLink = document.getElementById("ordersLink");
+        const referralLink = document.getElementById("referralLink");
+        const adminLink = document.getElementById("adminLink");
 
-        if (user.role === "admin") {
-            document.getElementById("adminLink").style.display = "block";
+        if (authLinks) authLinks.style.display = "none";
+        if (userLinks) userLinks.style.display = "flex";
+        if (userName) userName.textContent = `Hello, ${user.name}`;
+        if (accountLink) accountLink.style.display = "block";
+        if (ordersLink) ordersLink.style.display = "block";
+        if (referralLink) referralLink.style.display = "block";
+
+        if (user.role === "admin" && adminLink) {
+            adminLink.style.display = "block";
         }
     }
 }
@@ -126,10 +170,15 @@ function setupEventListeners() {
     const searchBtn = document.getElementById("searchBtn");
     const searchInput = document.getElementById("searchInput");
 
-    searchBtn.addEventListener("click", performSearch);
-    searchInput.addEventListener("keyup", (e) => {
-        if (e.key === "Enter") performSearch();
-    });
+    if (searchBtn) {
+        searchBtn.addEventListener("click", performSearch);
+    }
+    
+    if (searchInput) {
+        searchInput.addEventListener("keyup", (e) => {
+            if (e.key === "Enter") performSearch();
+        });
+    }
 }
 
 /* ------------------------------
@@ -199,6 +248,132 @@ function handleBuyClick(id) {
 }
 
 /* ------------------------------
+   LOAD BUNDLES (COMBO OFFERS)
+--------------------------------*/
+async function loadBundles() {
+    try {
+        const res = await fetch(`${API_URL}/bundles`);
+        const data = await res.json();
+
+        if (data.bundles && data.bundles.length > 0) {
+            // Show 5 bundles on desktop, 3 on mobile
+            const isMobile = window.innerWidth <= 768;
+            const limit = isMobile ? 3 : 5;
+            const limitedBundles = data.bundles.slice(0, limit);
+            displayBundles(limitedBundles, data.bundles.length, limit);
+            document.getElementById("bundlesSection").style.display = "block";
+        }
+    } catch (err) {
+        console.error("Error loading bundles:", err);
+    }
+}
+
+function displayBundles(bundles, totalCount, limit) {
+    const grid = document.getElementById("bundlesGrid");
+    grid.innerHTML = "";
+
+    bundles.forEach((bundle) => {
+        const card = document.createElement("div");
+        card.className = "book-card bundle-card";
+        card.style.border = "2px solid #ff4444";
+        card.style.position = "relative";
+
+        const discount = bundle.discount || Math.round(((bundle.originalPrice - bundle.bundlePrice) / bundle.originalPrice) * 100);
+
+        card.innerHTML = `
+            <div style="position: absolute; top: 10px; right: 10px; background: #ff4444; color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">
+                ${discount}% OFF
+            </div>
+            <img src="${bundle.image || 'data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"250\" height=\"300\"%3E%3Crect fill=\"%23ddd\" width=\"250\" height=\"300\"/%3E%3Ctext fill=\"%23999\" font-family=\"Arial\" font-size=\"20\" x=\"50%25\" y=\"50%25\" text-anchor=\"middle\" dy=\".3em\"%3EBundle%3C/text%3E%3C/svg%3E'}" class="book-cover" style="height: 200px; object-fit: cover;" />
+            <h3 style="font-size: 16px; margin: 10px 0 5px 0;">🎁 ${bundle.name}</h3>
+            <p style="font-size: 12px; color: #666; margin: 3px 0;">${bundle.books.length} Books Included</p>
+            <p style="text-decoration: line-through; color: #999; font-size: 13px; margin: 3px 0;">₹${bundle.originalPrice}</p>
+            <p class="book-price" style="font-size: 20px; color: #ff4444; margin: 5px 0;">₹${bundle.bundlePrice}</p>
+            <div class="book-actions" style="margin-top: 10px;">
+                <button class="btn-primary" onclick="viewBundle('${bundle._id}')" style="padding: 8px 12px; font-size: 13px;">View Bundle</button>
+                <button class="btn-secondary" onclick="addBundleToCart('${bundle._id}')" style="padding: 8px 12px; font-size: 13px;">Add to Cart</button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+
+    // Add "View All Offers" button if there are more bundles than the limit
+    if (totalCount > limit) {
+        const viewAllCard = document.createElement("div");
+        viewAllCard.className = "book-card";
+        viewAllCard.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        viewAllCard.style.display = "flex";
+        viewAllCard.style.alignItems = "center";
+        viewAllCard.style.justifyContent = "center";
+        viewAllCard.style.cursor = "pointer";
+        viewAllCard.style.minHeight = "280px";
+        
+        viewAllCard.innerHTML = `
+            <div style="text-align: center; color: white;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🎁</div>
+                <h3 style="color: white; font-size: 18px; margin-bottom: 8px;">View All Offers</h3>
+                <p style="color: rgba(255,255,255,0.9); font-size: 13px; margin-bottom: 12px;">${totalCount - limit} more bundles available</p>
+                <button class="btn-primary" style="background: white; color: #667eea; padding: 8px 16px; font-size: 13px;">Explore All</button>
+            </div>
+        `;
+        
+        viewAllCard.onclick = () => {
+            window.location.href = "/bundles.html";
+        };
+        
+        grid.appendChild(viewAllCard);
+    }
+}
+
+function viewBundle(bundleId) {
+    window.location.href = `/bundle.html?id=${bundleId}`;
+}
+
+async function addBundleToCart(bundleId) {
+    try {
+        const res = await fetch(`${API_URL}/bundles/${bundleId}`);
+        const data = await res.json();
+        const bundle = data.bundle;
+
+        let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+        // Check if bundle already in cart
+        if (cart.find(item => item.bundleId === bundleId)) {
+            return alert("This bundle is already in your cart!");
+        }
+
+        // Add bundle as a special cart item
+        cart.push({
+            bundleId: bundleId,
+            isBundle: true,
+            title: bundle.name,
+            price: bundle.bundlePrice,
+            originalPrice: bundle.originalPrice,
+            books: bundle.books,
+            quantity: 1,
+            coverImage: bundle.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="250" height="300"%3E%3Crect fill="%23ddd" width="250" height="300"/%3E%3Ctext fill="%23999" font-family="Arial" font-size="20" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EBundle%3C/text%3E%3C/svg%3E'
+        });
+
+        localStorage.setItem("cart", JSON.stringify(cart));
+        alert(`Bundle "${bundle.name}" added to cart!`);
+        
+        // Update cart count if exists
+        updateCartCount();
+    } catch (err) {
+        console.error("Error adding bundle to cart:", err);
+        alert("Error adding bundle to cart");
+    }
+}
+
+function updateCartCount() {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cartCount = document.getElementById("cartCount");
+    if (cartCount) {
+        cartCount.textContent = cart.length;
+    }
+}
+
+/* ------------------------------
    ADD TO CART
 --------------------------------*/
 document.addEventListener("click", (e) => {
@@ -220,5 +395,6 @@ document.addEventListener("click", (e) => {
         cart.push({ id: bookId, title, author, price, coverImage, quantity: 1 });
         localStorage.setItem("cart", JSON.stringify(cart));
         alert("Book added to cart!");
+        updateCartCount();
     }
 });

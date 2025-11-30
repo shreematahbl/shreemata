@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Orders - Admin</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            background: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        nav {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        nav h1 {
+            color: white;
+            margin: 0;
+            font-size: 24px;
+        }
+        nav div {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        nav a:hover, nav a.active {
+            background: rgba(255,255,255,0.2);
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .main-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 100px;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .admin-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .admin-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .admin-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .admin-table th:nth-child(3),
+        .admin-table td:nth-child(3) {
+            width: 280px;
+        }
+        .admin-table th:nth-child(1),
+        .admin-table td:nth-child(1) {
+            width: 100px;
+            font-size: 11px;
+        }
+        .admin-table th:nth-child(5),
+        .admin-table td:nth-child(5) {
+            width: 180px;
+            font-size: 12px;
+        }
+        .admin-table tbody tr:hover {
+            background: #f9f9f9;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 16px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .status-completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status-pending {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        .status-failed {
+            background: #ffebee;
+            color: #c62828;
+        }
+        footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            margin-top: 60px;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            nav .container {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            nav h1 {
+                font-size: 20px;
+            }
+            
+            nav div {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            nav a {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .main-container {
+                padding: 15px;
+                margin-top: 120px;
+            }
+            
+            .main-container h1 {
+                font-size: 20px !important;
+            }
+            
+            .main-container > div:first-child {
+                flex-direction: column !important;
+                gap: 15px;
+                align-items: flex-start !important;
+            }
+            
+            #exportExcelBtn {
+                width: 100%;
+            }
+            
+            #searchInput {
+                font-size: 16px !important; /* Prevents zoom on iOS */
+            }
+            
+            /* Hide table on mobile, show cards instead */
+            .admin-table {
+                display: none !important;
+            }
+            
+            .mobile-orders {
+                display: block !important;
+            }
+        }
+        
+        /* Mobile Card Layout */
+        .mobile-orders {
+            display: none;
+        }
+        
+        .order-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .order-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .order-card-section {
+            margin-bottom: 12px;
+        }
+        
+        .order-card-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .order-card-value {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.5;
+        }
+        
+        .order-card-actions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1>📚 BookStore Admin</h1>
+            <div>
+                <a href="/">🏠 Home</a>
+                <a href="/admin.html">Books</a>
+                <a href="/admin-bundles.html">Bundles</a>
+                <a href="/admin-orders.html" class="active">Orders</a>
+                <a href="/admin-withdrawals.html">Withdrawals</a>
+                <a href="/admin-notifications.html">Notifications</a>
+                <a href="/" id="logoutBtn">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <div>
+                    <h1 style="margin: 0 0 5px 0;">Customer Orders</h1>
+                    <p style="color: #666; margin: 0;">View and manage all customer orders</p>
+                </div>
+                <button id="exportExcelBtn" class="btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); display: none;">
+                    📊 Export to Excel
+                </button>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="🔍 Search by customer name, email, order ID, or items..." 
+                    style="width: 100%; padding: 12px 20px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;"
+                    onkeyup="filterOrders()"
+                    onfocus="this.style.borderColor='#667eea'"
+                    onblur="this.style.borderColor='#e0e0e0'"
+                />
+                <div id="searchResults" style="margin-top: 8px; color: #667eea; font-size: 13px; display: none;"></div>
+            </div>
+
+            <div id="ordersLoading" class="loading">Loading orders...</div>
+
+            <table class="admin-table" id="ordersTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Amount</th>
+                        <th>Delivery Address</th>
+                        <th>Payment Status</th>
+                        <th>Delivery Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersTableBody"></tbody>
+            </table>
+
+            <div class="mobile-orders" id="mobileOrders"></div>
+
+            <div id="ordersEmpty" class="empty-state" style="display:none;">
+                <p>No orders available.</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 BookStore. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/config.js"></script>
+    <script>
+        const API = window.API_URL;
+        let allOrders = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAdminAuth();
+            loadOrders();
+            
+            document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+        });
+
+        function checkAdminAuth() {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user') || 'null');
+
+            if (!token || !user || user.role !== 'admin') {
+                alert('Admin access required');
+                window.location.href = '/login.html';
+                return;
+            }
+        }
+
+        async function loadOrders() {
+            const token = localStorage.getItem("token");
+
+            document.getElementById("ordersLoading").style.display = "block";
+            document.getElementById("ordersTable").style.display = "none";
+            document.getElementById("ordersEmpty").style.display = "none";
+
+            try {
+                const res = await fetch(`${API}/orders/admin/all`, {
+                    headers: { "Authorization": "Bearer " + token }
+                });
+
+                const data = await res.json();
+                const tbody = document.getElementById("ordersTableBody");
+                tbody.innerHTML = "";
+
+                document.getElementById("ordersLoading").style.display = "none";
+
+                if (!data.orders || data.orders.length === 0) {
+                    document.getElementById("ordersEmpty").style.display = "block";
+                    return;
+                }
+
+                allOrders = data.orders;
+                document.getElementById("ordersTable").style.display = "table";
+                document.getElementById("exportExcelBtn").style.display = "block";
+
+                // Populate mobile cards
+                const mobileContainer = document.getElementById("mobileOrders");
+                mobileContainer.innerHTML = "";
+
+                data.orders.forEach(order => {
+                    // Create mobile card
+                    createMobileOrderCard(order, mobileContainer);
+                    const tr = document.createElement("tr");
+
+                    const itemsList = order.items.map(item => {
+                        const qty = item.quantity || 1;
+                        const qtyText = qty > 1 ? ` <strong style="color: #667eea;">(x${qty})</strong>` : '';
+                        if (item.type === 'bundle') {
+                            return `${item.title} <span style="color: #28a745; font-size: 11px;">(Bundle)</span>${qtyText}`;
+                        }
+                        return `${item.title}${qtyText}`;
+                    }).join('<br>');
+
+                    const statusClass = order.status === 'completed' ? 'status-completed' : 
+                                       order.status === 'pending' ? 'status-pending' : 'status-failed';
+
+                    // Format delivery address
+                    let addressText = '<span style="color: #999;">Not provided</span>';
+                    if (order.deliveryAddress && order.deliveryAddress.street) {
+                        const addr = order.deliveryAddress;
+                        addressText = `
+                            <div style="font-size: 12px; line-height: 1.5;">
+                                <div style="margin-bottom: 3px;">${addr.street}</div>
+                                <div style="margin-bottom: 3px;">${addr.city}, ${addr.state}</div>
+                                <div style="margin-bottom: 3px;">PIN: ${addr.pincode}</div>
+                                <div style="color: #667eea;">📞 ${addr.phone}</div>
+                            </div>
+                        `;
+                    }
+
+                    const paymentStatus = order.status || 'pending';
+                    const paymentStatusClass = paymentStatus === 'completed' ? 'status-completed' : 
+                                              paymentStatus === 'pending' ? 'status-pending' : 'status-failed';
+
+                    const deliveryStatus = order.deliveryStatus || 'pending';
+                    const deliveryStatusClass = deliveryStatus === 'delivered' ? 'status-completed' : 
+                                               deliveryStatus === 'shipped' ? 'status-pending' : 
+                                               deliveryStatus === 'processing' ? 'status-pending' : 'status-failed';
+
+                    tr.innerHTML = `
+                        <td><small>${order._id}</small></td>
+                        <td>
+                            <strong>${order.user_id?.name || "Unknown"}</strong><br>
+                            <small style="color: #666;">${order.user_id?.email || ""}</small>
+                        </td>
+                        <td>${itemsList}</td>
+                        <td><strong>₹${order.totalAmount}</strong></td>
+                        <td>${addressText}</td>
+                        <td>
+                            <span class="status-badge ${paymentStatusClass}">${paymentStatus}</span>
+                        </td>
+                        <td>
+                            <span class="status-badge ${deliveryStatusClass}">${deliveryStatus}</span>
+                        </td>
+                        <td>${new Date(order.createdAt).toLocaleDateString()}<br>
+                            <small style="color: #666;">${new Date(order.createdAt).toLocaleTimeString()}</small>
+                        </td>
+                        <td>
+                            <button class="btn" style="padding: 6px 12px; font-size: 12px;" onclick="updateDelivery('${order._id}')">
+                                Update Delivery
+                            </button>
+                        </td>
+                    `;
+
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading orders:", err);
+                document.getElementById("ordersLoading").style.display = "none";
+                document.getElementById("ordersEmpty").style.display = "block";
+            }
+        }
+
+        function createMobileOrderCard(order, container) {
+            const itemsList = order.items.map(item => {
+                const qty = item.quantity || 1;
+                const qtyText = qty > 1 ? ` (x${qty})` : '';
+                if (item.type === 'bundle') {
+                    return `${item.title} <span style="color: #28a745; font-size: 11px;">(Bundle)</span>${qtyText}`;
+                }
+                return `${item.title}${qtyText}`;
+            }).join('<br>');
+
+            const paymentStatus = order.status || 'pending';
+            const paymentStatusClass = paymentStatus === 'completed' ? 'status-completed' : 
+                                      paymentStatus === 'pending' ? 'status-pending' : 'status-failed';
+
+            const deliveryStatus = order.deliveryStatus || 'pending';
+            const deliveryStatusClass = deliveryStatus === 'delivered' ? 'status-completed' : 
+                                       deliveryStatus === 'shipped' ? 'status-pending' : 
+                                       deliveryStatus === 'processing' ? 'status-pending' : 'status-failed';
+
+            let addressText = 'Not provided';
+            if (order.deliveryAddress && order.deliveryAddress.street) {
+                const addr = order.deliveryAddress;
+                addressText = `${addr.street}, ${addr.city}, ${addr.state} - ${addr.pincode}<br>📞 ${addr.phone}`;
+            }
+
+            const card = document.createElement('div');
+            card.className = 'order-card';
+            card.innerHTML = `
+                <div class="order-card-header">
+                    <div>
+                        <div style="font-size: 11px; color: #999; margin-bottom: 5px;">ORDER ID</div>
+                        <div style="font-size: 12px; font-family: monospace; color: #667eea;">${order._id}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 20px; font-weight: 700; color: #28a745;">₹${order.totalAmount}</div>
+                        <div style="font-size: 11px; color: #999;">${new Date(order.createdAt).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                <div class="order-card-section">
+                    <div class="order-card-label">👤 Customer</div>
+                    <div class="order-card-value">
+                        <strong>${order.user_id?.name || "Unknown"}</strong><br>
+                        <span style="color: #666; font-size: 13px;">${order.user_id?.email || ""}</span>
+                    </div>
+                </div>
+
+                <div class="order-card-section">
+                    <div class="order-card-label">📚 Items</div>
+                    <div class="order-card-value">${itemsList}</div>
+                </div>
+
+                <div class="order-card-section">
+                    <div class="order-card-label">📍 Delivery Address</div>
+                    <div class="order-card-value" style="font-size: 13px;">${addressText}</div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <div class="order-card-label">💳 Payment</div>
+                        <span class="status-badge ${paymentStatusClass}">${paymentStatus}</span>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="order-card-label">🚚 Delivery</div>
+                        <span class="status-badge ${deliveryStatusClass}">${deliveryStatus}</span>
+                    </div>
+                </div>
+
+                <div class="order-card-actions">
+                    <button class="btn" style="width: 100%; padding: 10px; font-size: 14px;" onclick="updateDelivery('${order._id}')">
+                        Update Delivery Status
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+
+        function filterOrders() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const searchResults = document.getElementById('searchResults');
+
+            // Filter desktop table
+            const tbody = document.getElementById('ordersTableBody');
+            const rows = tbody.getElementsByTagName('tr');
+
+            // Filter mobile cards
+            const mobileContainer = document.getElementById('mobileOrders');
+            const cards = mobileContainer.getElementsByClassName('order-card');
+
+            let visibleCount = 0;
+            const totalCount = rows.length;
+
+            // Filter table rows
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const text = row.textContent.toLowerCase();
+
+                if (text.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+
+            // Filter mobile cards
+            for (let i = 0; i < cards.length; i++) {
+                const card = cards[i];
+                const text = card.textContent.toLowerCase();
+
+                if (text.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            }
+
+            // Show search results count
+            if (searchTerm !== '') {
+                searchResults.style.display = 'block';
+                if (visibleCount === 0) {
+                    searchResults.innerHTML = '❌ No orders found matching "' + searchTerm + '"';
+                    searchResults.style.color = '#dc3545';
+                } else if (visibleCount === totalCount) {
+                    searchResults.innerHTML = '✅ Showing all ' + totalCount + ' orders';
+                    searchResults.style.color = '#28a745';
+                } else {
+                    searchResults.innerHTML = '✅ Found ' + visibleCount + ' of ' + totalCount + ' orders';
+                    searchResults.style.color = '#667eea';
+                }
+            } else {
+                searchResults.style.display = 'none';
+            }
+        }
+
+        function exportToExcel() {
+            if (!allOrders || allOrders.length === 0) {
+                alert('No orders to export');
+                return;
+            }
+
+            // Prepare data for Excel
+            const excelData = allOrders.map(order => {
+                const itemsList = order.items.map(item => {
+                    const qty = item.quantity || 1;
+                    const qtyText = qty > 1 ? ` (x${qty})` : '';
+                    if (item.type === 'bundle') {
+                        return `${item.title} (Bundle)${qtyText}`;
+                    }
+                    return `${item.title}${qtyText}`;
+                }).join(', ');
+
+                // Format delivery address for Excel
+                let deliveryAddress = 'Not provided';
+                if (order.deliveryAddress && order.deliveryAddress.street) {
+                    const addr = order.deliveryAddress;
+                    deliveryAddress = `${addr.street}, ${addr.city}, ${addr.state} - ${addr.pincode}`;
+                }
+
+                return {
+                    'Order ID': order._id,
+                    'Customer Name': order.user_id?.name || 'Unknown',
+                    'Customer Email': order.user_id?.email || '',
+                    'Items': itemsList,
+                    'Amount (₹)': order.totalAmount,
+                    'Status': order.status,
+                    'Delivery Address': deliveryAddress,
+                    'Phone': order.deliveryAddress?.phone || '',
+                    'Order Date': new Date(order.createdAt).toLocaleDateString(),
+                    'Order Time': new Date(order.createdAt).toLocaleTimeString(),
+                    'Payment ID': order.razorpay_payment_id || '',
+                    'Order ID (Razorpay)': order.razorpay_order_id || ''
+                };
+            });
+
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet(excelData);
+
+            // Set column widths
+            ws['!cols'] = [
+                { wch: 25 }, // Order ID
+                { wch: 20 }, // Customer Name
+                { wch: 30 }, // Customer Email
+                { wch: 40 }, // Items
+                { wch: 12 }, // Amount
+                { wch: 12 }, // Status
+                { wch: 50 }, // Delivery Address
+                { wch: 15 }, // Phone
+                { wch: 15 }, // Order Date
+                { wch: 15 }, // Order Time
+                { wch: 25 }, // Payment ID
+                { wch: 25 }  // Order ID (Razorpay)
+            ];
+
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+
+            // Generate filename with current date
+            const today = new Date();
+            const filename = `Orders_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}.xlsx`;
+
+            // Download file
+            XLSX.writeFile(wb, filename);
+        }
+
+        function updateDelivery(orderId) {
+            const statusInput = prompt("Enter delivery status:\n1. pending\n2. processing\n3. shipped\n4. delivered\n\nEnter number (1-4):");
+            if (!statusInput) return;
+
+            const statusMap = {
+                '1': 'pending',
+                '2': 'processing',
+                '3': 'shipped',
+                '4': 'delivered'
+            };
+
+            const status = statusMap[statusInput];
+            
+            if (!status) {
+                alert("Invalid status. Please enter 1, 2, 3, or 4");
+                return;
+            }
+
+            const trackingInfo = prompt("Enter tracking information (optional):");
+
+            updateDeliveryStatus(orderId, status, trackingInfo || "");
+        }
+
+        async function updateDeliveryStatus(orderId, deliveryStatus, trackingInfo) {
+            const token = localStorage.getItem("token");
+
+            console.log("Updating delivery:", { orderId, deliveryStatus, trackingInfo });
+
+            try {
+                const res = await fetch(`${window.API_URL}/orders/admin/update-delivery/${orderId}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + token
+                    },
+                    body: JSON.stringify({ deliveryStatus, trackingInfo })
+                });
+
+                console.log("Response status:", res.status);
+                const data = await res.json();
+                console.log("Response data:", data);
+
+                if (res.ok) {
+                    alert("Delivery status updated successfully!");
+                    loadOrders();
+                } else {
+                    alert(data.error || "Error updating delivery status");
+                }
+            } catch (err) {
+                console.error("Error:", err);
+                alert("Error updating delivery status: " + err.message);
+            }
+        }
+
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+        });
+    </script>
+</body>
+</html>

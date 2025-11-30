@@ -1,21 +1,29 @@
 /* ----------------------------------------------
-   ACCOUNT PAGE STYLES
+   ACCOUNT PAGE STYLES - Modern Design
 ---------------------------------------------- */
 
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
 .account-container {
-    max-width: 900px;
-    margin: 30px auto;
+    max-width: 1000px;
+    margin: 100px auto 40px;
     background: #fff;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 }
 
 .account-container h1 {
     text-align: center;
-    font-size: 32px;
-    color: #131921;
-    margin-bottom: 25px;
+    font-size: 36px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 30px;
     font-weight: 700;
 }
 
@@ -23,103 +31,167 @@
 .account-menu {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    margin-bottom: 30px;
+    gap: 12px;
+    margin-bottom: 35px;
     flex-wrap: wrap;
 }
 
 .account-menu button {
-    padding: 12px 20px;
-    background: #f0c14b;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
+    padding: 12px 24px;
+    background: white;
+    border: 2px solid #667eea;
+    border-radius: 25px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: 0.2s;
+    transition: all 0.3s ease;
+    color: #667eea;
 }
 
 .account-menu button:hover {
-    background: #ddb347;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 /* Section Card */
 .account-section {
-    background: #fafafa;
-    padding: 25px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    padding: 30px;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
     margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .account-section h2 {
-    margin-bottom: 15px;
-    font-size: 26px;
-    color: #131921;
+    margin-bottom: 20px;
+    font-size: 24px;
+    color: #667eea;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.account-section h2::before {
+    content: "•";
+    color: #667eea;
+    font-size: 30px;
 }
 
 /* Profile details */
 .account-section p {
     font-size: 16px;
-    padding: 8px 0;
+    padding: 12px 0;
     color: #333;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.account-section p:last-child {
+    border-bottom: none;
 }
 
 .account-section strong {
-    color: #000;
+    color: #667eea;
+    font-weight: 600;
+    display: inline-block;
+    min-width: 120px;
 }
 
 /* Edit form */
-#editForm {
+#editForm, #addressForm {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 18px;
 }
 
-#editForm input {
-    padding: 12px;
+#editForm input, #addressForm input {
+    padding: 14px 18px;
     font-size: 15px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    transition: all 0.3s ease;
 }
 
-#editForm button {
-    padding: 12px;
-    background: #667eea;
+#editForm input:focus, #addressForm input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-primary {
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     font-weight: 600;
     font-size: 16px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-#editForm button:hover {
-    background: #556cd6;
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    padding: 14px 28px;
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background: #f8f9fa;
 }
 
 /* Orders */
 #ordersList {
-    margin-top: 10px;
+    margin-top: 15px;
 }
 
 .order-card {
     background: white;
-    padding: 15px;
-    border: 1px solid #ddd;
-    margin-bottom: 12px;
-    border-radius: 8px;
+    padding: 20px;
+    border: 2px solid #e0e0e0;
+    margin-bottom: 15px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.order-card:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
 }
 
 .order-card h3 {
-    margin-bottom: 8px;
-    color: #131921;
+    margin-bottom: 12px;
+    color: #667eea;
     font-size: 18px;
+    font-weight: 600;
 }
 
 .order-card p {
     font-size: 14px;
-    color: #333;
+    color: #666;
+    padding: 6px 0;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.order-card p:last-child {
+    border-bottom: none;
 }
 
 /* Responsive */

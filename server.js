@@ -48,6 +48,11 @@ app.use("/api/books", bookRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/referral", require("./routes/referral"));
 app.use("/api/referral", require("./routes/referralTree"));
+app.use("/api/admin/withdrawals", require("./routes/adminWithdraw"));
+app.use("/api/admin/fix-rewards", require("./routes/fixDuplicateRewards"));
+app.use("/api/bundles", require("./routes/bundles"));
+app.use("/api/notifications", require("./routes/notifications"));
+
 
 
 

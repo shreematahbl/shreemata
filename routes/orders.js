@@ -1,25 +1,14 @@
 // routes/orders.js
 const express = require("express");
 const Order = require("../models/Order");
-const User = require("../models/User"); // <-- IMPORTANT
+const User = require("../models/User");
 const { authenticateToken, isAdmin } = require("../middleware/auth");
+const { sendDeliveryStatusEmail } = require("../utils/emailService");
 
 const router = express.Router();
 
 /**
- * REWARD SEQUENCE:
- * 1 → ₹10
- * 2 → ₹8
- * 3 → ₹6
- * 4 → ₹4
- * 5 → ₹3
- * 6 → ₹1
- * 7+ → ₹0.5
- */
-const rewardSequence = [10, 8, 6, 4, 3, 1, 0.5, 0.5, 0.5];
-
-/**
- * CREATE ORDER (with REFERRAL REWARD)
+ * CREATE ORDER (Referral rewards applied ONLY after payment verification)
  */
 router.post("/", authenticateToken, async (req, res) => {
     try {
@@ -29,44 +18,14 @@ router.post("/", authenticateToken, async (req, res) => {
             return res.status(400).json({ error: "No items in order" });
         }
 
-        // -------------------------
-        // 1. Create Order
-        // -------------------------
+        // Create Order - rewards will be applied after payment is verified
         const order = await Order.create({
             user_id: req.user.id,
             items,
             totalAmount,
-            status: "pending"
+            status: "pending",
+            rewardApplied: false
         });
-
-        // -------------------------
-        // 2. Apply Referral Reward
-        // -------------------------
-        const user = await User.findById(req.user.id);
-
-        // Only reward if:
-        // - user was referred
-        // - user has NOT used first purchase reward before
-        if (user && user.referredBy && !user.firstPurchaseDone) {
-
-            const referrer = await User.findOne({ referralCode: user.referredBy });
-
-            if (referrer) {
-                const referralCount = referrer.referrals;
-
-                // get reward based on index, fallback to 0.5
-                const reward = rewardSequence[referralCount] ?? 0.5;
-
-                referrer.wallet += reward;
-                referrer.referrals += 1;
-
-                await referrer.save();
-
-                // mark user so reward is not repeated
-                user.firstPurchaseDone = true;
-                await user.save();
-            }
-        }
 
         return res.json({ message: "Order created", order });
 
@@ -108,7 +67,7 @@ router.get("/admin/all", authenticateToken, isAdmin, async (req, res) => {
 });
 
 /**
- * UPDATE PAYMENT STATUS (Admin)
+ * ADMIN — UPDATE ORDER STATUS
  */
 router.put("/admin/update-status/:id", authenticateToken, isAdmin, async (req, res) => {
     try {
@@ -137,3 +96,61 @@ router.put("/admin/update-status/:id", authenticateToken, isAdmin, async (req, r
 });
 
 module.exports = router;
+
+/**
+ * UPDATE DELIVERY STATUS (Admin only)
+ */
+router.put("/admin/update-delivery/:orderId", authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { deliveryStatus, trackingInfo } = req.body;
+
+        const validStatuses = ["pending", "processing", "shipped", "delivered"];
+        if (!validStatuses.includes(deliveryStatus)) {
+            return res.status(400).json({ error: "Invalid delivery status" });
+        }
+
+        const order = await Order.findByIdAndUpdate(
+            orderId,
+            {
+                deliveryStatus,
+                trackingInfo: trackingInfo || ""
+            },
+            { new: true }
+        );
+
+        if (!order) {
+            return res.status(404).json({ error: "Order not found" });
+        }
+
+        // Send email notification to customer about status update
+        try {
+            const user = await User.findById(order.user_id);
+            if (user && user.email) {
+                console.log(`📧 Sending delivery status email to: ${user.email}`);
+                console.log(`   Status: ${deliveryStatus}`);
+                
+                const emailResult = await sendDeliveryStatusEmail(
+                    order, 
+                    user, 
+                    deliveryStatus, 
+                    trackingInfo || ''
+                );
+                
+                if (emailResult.success) {
+                    console.log('✅ Delivery status email sent successfully');
+                } else {
+                    console.error('❌ Failed to send delivery status email:', emailResult.error);
+                }
+            }
+        } catch (emailError) {
+            console.error('❌ Email error (non-blocking):', emailError);
+            // Don't fail the status update if email fails
+        }
+
+        res.json({ message: "Delivery status updated", order });
+    } catch (err) {
+        console.error("Update delivery error:", err);
+        res.status(500).json({ error: "Error updating delivery status" });
+    }
+});

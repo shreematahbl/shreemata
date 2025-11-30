@@ -207,4 +207,25 @@ router.post("/:id/purchase", authenticateToken, async (req, res) => {
   }
 });
 
+/* -------------------------------------------
+   UPLOAD SINGLE IMAGE (for bundles, etc.)
+------------------------------------------- */
+const singleUpload = upload.single("image");
+
+router.post("/upload-image", authenticateToken, isAdmin, singleUpload, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file provided" });
+    }
+
+    res.json({ 
+      message: "Image uploaded successfully",
+      url: req.file.path 
+    });
+  } catch (err) {
+    console.error("Error uploading image:", err);
+    res.status(500).json({ error: "Error uploading image" });
+  }
+});
+
 module.exports = router;

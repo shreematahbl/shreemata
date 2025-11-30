@@ -108,12 +108,20 @@ function displayBookDetails(book) {
 
     if (book.preview_images?.length) {
         previewGrid.innerHTML = "";
+        
+        // Store preview images globally for lightbox
+        window.previewImages = book.preview_images;
+        
         book.preview_images.forEach((imgURL, index) => {
             const img = document.createElement("img");
             img.src = imgURL;
             img.alt = `Preview ${index + 1}`;
             img.classList.add("preview-image");
             img.onerror = () => (img.src = "https://via.placeholder.com/400x600?text=Unavailable");
+            
+            // Add click event to open lightbox
+            img.addEventListener("click", () => openLightbox(index));
+            
             previewGrid.appendChild(img);
         });
     } else {
@@ -122,8 +130,80 @@ function displayBookDetails(book) {
 }
 
 /* -----------------------------------
-   BUY NOW → Razorpay Checkout
+   IMAGE LIGHTBOX FUNCTIONS
 ----------------------------------- */
+let currentImageIndex = 0;
+
+function openLightbox(index) {
+    currentImageIndex = index;
+    const lightbox = document.getElementById("imageLightbox");
+    const lightboxImage = document.getElementById("lightboxImage");
+    const lightboxCaption = document.getElementById("lightboxCaption");
+    
+    if (window.previewImages && window.previewImages.length > 0) {
+        lightboxImage.src = window.previewImages[currentImageIndex];
+        lightboxCaption.textContent = `Page ${currentImageIndex + 1} of ${window.previewImages.length}`;
+        lightbox.style.display = "flex";
+        
+        // Prevent body scroll when lightbox is open
+        document.body.style.overflow = "hidden";
+    }
+}
+
+function closeLightbox() {
+    const lightbox = document.getElementById("imageLightbox");
+    lightbox.style.display = "none";
+    
+    // Restore body scroll
+    document.body.style.overflow = "auto";
+}
+
+function nextImage() {
+    if (window.previewImages && window.previewImages.length > 0) {
+        currentImageIndex = (currentImageIndex + 1) % window.previewImages.length;
+        const lightboxImage = document.getElementById("lightboxImage");
+        const lightboxCaption = document.getElementById("lightboxCaption");
+        
+        lightboxImage.src = window.previewImages[currentImageIndex];
+        lightboxCaption.textContent = `Page ${currentImageIndex + 1} of ${window.previewImages.length}`;
+    }
+}
+
+function previousImage() {
+    if (window.previewImages && window.previewImages.length > 0) {
+        currentImageIndex = (currentImageIndex - 1 + window.previewImages.length) % window.previewImages.length;
+        const lightboxImage = document.getElementById("lightboxImage");
+        const lightboxCaption = document.getElementById("lightboxCaption");
+        
+        lightboxImage.src = window.previewImages[currentImageIndex];
+        lightboxCaption.textContent = `Page ${currentImageIndex + 1} of ${window.previewImages.length}`;
+    }
+}
+
+// Keyboard navigation for lightbox
+document.addEventListener("keydown", (e) => {
+    const lightbox = document.getElementById("imageLightbox");
+    if (lightbox && lightbox.style.display === "flex") {
+        if (e.key === "Escape") {
+            closeLightbox();
+        } else if (e.key === "ArrowRight") {
+            nextImage();
+        } else if (e.key === "ArrowLeft") {
+            previousImage();
+        }
+    }
+});
+
+/* -----------------------------------
+   BUY NOW → Show Address Modal
+----------------------------------- */
+
+/* -----------------------------------
+   BUY NOW → Show Address Modal
+----------------------------------- */
+let userAddress = null;
+let currentBook = null;
+
 async function handlePurchase() {
     const token = localStorage.getItem("token");
     const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -140,9 +220,170 @@ async function handlePurchase() {
         // Fetch book details
         const res = await fetch(`${API}/books/${bookId}`);
         const data = await res.json();
-        const book = data.book;
+        currentBook = data.book;
 
-        // 1️⃣ Create backend Razorpay order
+        // Show address modal
+        await showAddressModal();
+    } catch (err) {
+        console.error("Error:", err);
+        alert("Error loading book details");
+    }
+}
+
+async function showAddressModal() {
+    const token = localStorage.getItem("token");
+
+    try {
+        // Fetch user address
+        const res = await fetch(`${API}/users/profile`, {
+            headers: { "Authorization": "Bearer " + token }
+        });
+
+        const data = await res.json();
+        
+        if (data.user && data.user.address) {
+            userAddress = data.user.address;
+            
+            document.getElementById("modalStreet").textContent = userAddress.street || "Not set";
+            document.getElementById("modalCity").textContent = userAddress.city || "Not set";
+            document.getElementById("modalState").textContent = userAddress.state || "Not set";
+            document.getElementById("modalPincode").textContent = userAddress.pincode || "Not set";
+            document.getElementById("modalPhone").textContent = userAddress.phone || "Not set";
+
+            // Pre-fill edit form
+            document.getElementById("editStreet").value = userAddress.street || "";
+            document.getElementById("editCity").value = userAddress.city || "";
+            document.getElementById("editState").value = userAddress.state || "";
+            document.getElementById("editPincode").value = userAddress.pincode || "";
+            document.getElementById("editPhone").value = userAddress.phone || "";
+        }
+
+        // Show modal
+        document.getElementById("addressModal").style.display = "block";
+
+    } catch (err) {
+        console.error("Error loading address:", err);
+        alert("Error loading address. Please try again.");
+    }
+}
+
+function closeAddressModal() {
+    document.getElementById("addressModal").style.display = "none";
+    document.getElementById("addressEditForm").style.display = "none";
+    document.getElementById("addressDisplay").style.display = "block";
+}
+
+function toggleAddressForm() {
+    const form = document.getElementById("addressEditForm");
+    const display = document.getElementById("addressDisplay");
+    
+    if (form.style.display === "none") {
+        form.style.display = "block";
+        display.style.display = "none";
+    } else {
+        form.style.display = "none";
+        display.style.display = "block";
+    }
+}
+
+// Handle address form submission
+document.addEventListener("DOMContentLoaded", () => {
+    const addressForm = document.getElementById("addressEditForm");
+    if (addressForm) {
+        addressForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            await saveAddressFromModal();
+        });
+    }
+});
+
+async function saveAddressFromModal() {
+    const token = localStorage.getItem("token");
+
+    const address = {
+        street: document.getElementById("editStreet").value.trim(),
+        city: document.getElementById("editCity").value.trim(),
+        state: document.getElementById("editState").value.trim(),
+        pincode: document.getElementById("editPincode").value.trim(),
+        phone: document.getElementById("editPhone").value.trim()
+    };
+
+    try {
+        const res = await fetch(`${API}/users/update-address`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + token
+            },
+            body: JSON.stringify({ address })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || "Failed to update address");
+            return;
+        }
+
+        userAddress = address;
+        
+        // Update display
+        document.getElementById("modalStreet").textContent = address.street;
+        document.getElementById("modalCity").textContent = address.city;
+        document.getElementById("modalState").textContent = address.state;
+        document.getElementById("modalPincode").textContent = address.pincode;
+        document.getElementById("modalPhone").textContent = address.phone;
+
+        alert("Address updated successfully!");
+        toggleAddressForm();
+
+    } catch (err) {
+        console.error("Address update error:", err);
+        alert("Error updating address");
+    }
+}
+
+/* -----------------------------------
+   Proceed to Payment with Address
+----------------------------------- */
+async function proceedToPayment() {
+    const token = localStorage.getItem("token");
+
+    // Validate address
+    if (!userAddress || !userAddress.street || !userAddress.city || !userAddress.state || !userAddress.pincode || !userAddress.phone) {
+        const proceed = confirm("You haven't set a delivery address. Do you want to proceed anyway?");
+        if (!proceed) {
+            return;
+        }
+        userAddress = null;
+    }
+
+    if (!currentBook) {
+        alert("Book details not loaded");
+        return;
+    }
+
+    // Close modal
+    closeAddressModal();
+
+    const buyBtn = document.getElementById("buyBtn");
+    const items = [{
+        id: currentBook._id,
+        title: currentBook.title,
+        author: currentBook.author,
+        price: currentBook.price,
+        quantity: 1,
+        coverImage: currentBook.cover_image,
+        type: 'book'
+    }];
+
+    try {
+        if (buyBtn) {
+            buyBtn.disabled = true;
+            buyBtn.textContent = "Processing...";
+        }
+
+        // 1️⃣ Create backend Razorpay order with address
         const orderRes = await fetch(`${API}/payments/create-order`, {
             method: "POST",
             headers: {
@@ -150,32 +391,84 @@ async function handlePurchase() {
                 "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
-                amount: book.price,
-                user_id: user._id,
-                items: [{
-                    id: book._id,
-                    title: book.title,
-                    author: book.author,
-                    price: book.price,
-                    quantity: 1,
-                    coverImage: book.cover_image
-                }]
+                amount: currentBook.price,
+                items: items,
+                deliveryAddress: userAddress
             })
         });
 
         const orderData = await orderRes.json();
 
+        if (!orderRes.ok || !orderData.order) {
+            throw new Error(orderData.error || "Failed to create order");
+        }
+
         // 2️⃣ Razorpay Checkout
+        const RZP_KEY = window.RAZORPAY_KEY || "rzp_test_RjA5o7ViCyygdZ";
+
         const options = {
-            key: "rzp_test_RjA5o7ViCyygdZ", // your test key
+            key: RZP_KEY,
             amount: orderData.order.amount,
             currency: "INR",
             name: "BookStore",
-            description: book.title,
+            description: currentBook.title,
             order_id: orderData.order.id,
 
-            handler: function (response) {
-                alert("Payment completed! Webhook will update order status.");
+            handler: async function (response) {
+                try {
+                    // 3️⃣ Verify payment on backend
+                    const verifyRes = await fetch(`${API}/payments/verify`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            items: items,
+                            totalAmount: currentBook.price,
+                            deliveryAddress: userAddress
+                        })
+                    });
+
+                    const verifyData = await verifyRes.json();
+
+                    if (!verifyRes.ok) {
+                        alert(verifyData.error || "Payment verification failed");
+                        if (buyBtn) {
+                            buyBtn.disabled = false;
+                            buyBtn.textContent = "Buy Now";
+                        }
+                        return;
+                    }
+
+                    alert("Payment successful! Thank you for your purchase. Check your email for order confirmation.");
+                    window.location.href = "/orders.html";
+
+                } catch (err) {
+                    console.error("Verification error:", err);
+                    alert("Payment succeeded but verification failed. Contact support.");
+                    if (buyBtn) {
+                        buyBtn.disabled = false;
+                        buyBtn.textContent = "Buy Now";
+                    }
+                }
+            },
+
+            modal: {
+                ondismiss: function () {
+                    if (buyBtn) {
+                        buyBtn.disabled = false;
+                        buyBtn.textContent = "Buy Now";
+                    }
+                }
+            },
+
+            prefill: {
+                name: (JSON.parse(localStorage.getItem("user") || "{}")).name || "",
+                email: (JSON.parse(localStorage.getItem("user") || "{}")).email || ""
             },
 
             theme: { color: "#3399cc" }
@@ -186,7 +479,11 @@ async function handlePurchase() {
 
     } catch (err) {
         console.error("Payment Error:", err);
-        alert("Payment failed. Try again.");
+        alert(err.message || "Payment failed. Try again.");
+        if (buyBtn) {
+            buyBtn.disabled = false;
+            buyBtn.textContent = "Buy Now";
+        }
     }
 }
 
