@@ -60,7 +60,7 @@ router.get("/:id", async (req, res) => {
  */
 router.post("/admin/create", authenticateToken, isAdmin, async (req, res) => {
     try {
-        const { name, description, bookIds, bundlePrice, image, validUntil } = req.body;
+        const { name, description, bookIds, bundlePrice, image, validUntil, rewardPoints } = req.body;
 
         if (!name || !bookIds || bookIds.length < 1) {
             return res.status(400).json({ 
@@ -101,7 +101,8 @@ router.post("/admin/create", authenticateToken, isAdmin, async (req, res) => {
             bundlePrice,
             weight: totalWeight,
             image,
-            validUntil: validUntil || null
+            validUntil: validUntil || null,
+            rewardPoints: rewardPoints || 0
         });
 
         const populatedBundle = await Bundle.findById(bundle._id)
@@ -139,7 +140,7 @@ router.get("/admin/all", authenticateToken, isAdmin, async (req, res) => {
  */
 router.put("/admin/update/:id", authenticateToken, isAdmin, async (req, res) => {
     try {
-        const { name, description, bookIds, bundlePrice, image, validUntil, isActive } = req.body;
+        const { name, description, bookIds, bundlePrice, image, validUntil, isActive, rewardPoints } = req.body;
 
         const bundle = await Bundle.findById(req.params.id);
         if (!bundle) {
@@ -152,6 +153,7 @@ router.put("/admin/update/:id", authenticateToken, isAdmin, async (req, res) => 
         if (image) bundle.image = image;
         if (validUntil !== undefined) bundle.validUntil = validUntil;
         if (isActive !== undefined) bundle.isActive = isActive;
+        if (rewardPoints !== undefined) bundle.rewardPoints = rewardPoints;
 
         // If books changed, recalculate original price and weight
         if (bookIds && bookIds.length >= 1) {

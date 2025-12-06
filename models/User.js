@@ -5,8 +5,18 @@ const userSchema = new mongoose.Schema({
   email: { type: String, unique: true },
   password: String,
 
-  // User role (user/admin)
+  // User role (user/admin/virtual)
   role: { type: String, default: "user" },
+
+  // Virtual User Fields
+  isVirtual: {
+    type: Boolean,
+    default: false
+  },
+  originalUser: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
 
   // Delivery Address
   address: {
@@ -50,6 +60,20 @@ const userSchema = new mongoose.Schema({
     default: 0 
   },
   treeCommissionEarned: { 
+    type: Number, 
+    default: 0 
+  },
+
+  // Points System
+  pointsWallet: { 
+    type: Number, 
+    default: 0 
+  },
+  totalPointsEarned: { 
+    type: Number, 
+    default: 0 
+  },
+  virtualReferralsCreated: { 
     type: Number, 
     default: 0 
   },

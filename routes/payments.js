@@ -7,6 +7,9 @@ const User = require("../models/User");
 const { authenticateToken } = require("../middleware/auth");
 const { sendOrderConfirmationEmail, sendAdminNotification } = require("../utils/emailService");
 const { distributeCommissions } = require("../services/commissionDistribution");
+const { awardPoints } = require("../services/pointsService");
+const Book = require("../models/Book");
+const Bundle = require("../models/Bundle");
 
 const router = express.Router();
 
@@ -286,10 +289,44 @@ router.post("/verify", authenticateToken, async (req, res) => {
       // Implement retry logic here if needed
     }
 
-    // APPLY OLD REFERRAL SYSTEM (order already marked as rewardApplied)
-    // TODO: Remove this once new system is fully tested
-    const result = await applyReferralRewardForOrder(order);
-    console.log("Referral Result:", result);
+    // AWARD POINTS FOR PURCHASED ITEMS
+    try {
+      console.log("🎁 Awarding points for order:", order._id);
+      for (const item of order.items) {
+        let points = 0;
+        
+        if (item.type === 'book') {
+          const book = await Book.findById(item.id);
+          if (book && book.rewardPoints > 0) {
+            points = book.rewardPoints * item.quantity;
+          }
+        } else if (item.type === 'bundle') {
+          const bundle = await Bundle.findById(item.id);
+          if (bundle && bundle.rewardPoints > 0) {
+            points = bundle.rewardPoints * item.quantity;
+          }
+        }
+        
+        if (points > 0) {
+          await awardPoints(
+            order.user_id,
+            points,
+            item.type === 'book' ? 'book_purchase' : 'bundle_purchase',
+            item.id,
+            order._id
+          );
+          console.log(`✅ Awarded ${points} points for ${item.title}`);
+        }
+      }
+    } catch (pointsError) {
+      console.error("❌ Points awarding error:", pointsError);
+      // Log error but don't fail the payment verification
+    }
+
+    // OLD REFERRAL SYSTEM DISABLED - Using new commission distribution system only
+    // The old system was causing double payments by adding to wallet twice
+    // const result = await applyReferralRewardForOrder(order);
+    // console.log("Referral Result:", result);
 
     // SEND EMAIL NOTIFICATIONS - ALWAYS EXECUTE
     console.log("\n🔍 ===== EMAIL NOTIFICATION PROCESS STARTED =====");
@@ -418,10 +455,43 @@ router.post("/webhook", async (req, res) => {
           console.error("❌ Webhook: Commission distribution error:", commissionError);
           // Implement retry logic here if needed
         }
+
+        // AWARD POINTS FOR PURCHASED ITEMS
+        try {
+          console.log("🎁 Webhook: Awarding points for order:", order._id);
+          for (const item of order.items) {
+            let points = 0;
+            
+            if (item.type === 'book') {
+              const book = await Book.findById(item.id);
+              if (book && book.rewardPoints > 0) {
+                points = book.rewardPoints * item.quantity;
+              }
+            } else if (item.type === 'bundle') {
+              const bundle = await Bundle.findById(item.id);
+              if (bundle && bundle.rewardPoints > 0) {
+                points = bundle.rewardPoints * item.quantity;
+              }
+            }
+            
+            if (points > 0) {
+              await awardPoints(
+                order.user_id,
+                points,
+                item.type === 'book' ? 'book_purchase' : 'bundle_purchase',
+                item.id,
+                order._id
+              );
+              console.log(`✅ Webhook: Awarded ${points} points for ${item.title}`);
+            }
+          }
+        } catch (pointsError) {
+          console.error("❌ Webhook: Points awarding error:", pointsError);
+        }
         
-        // APPLY OLD REFERRAL SYSTEM
-        // TODO: Remove this once new system is fully tested
-        await applyReferralRewardForOrder(order);
+        // OLD REFERRAL SYSTEM DISABLED - Using new commission distribution system only
+        // The old system was causing double payments by adding to wallet twice
+        // await applyReferralRewardForOrder(order);
         
         // Send email notification from webhook as backup
         console.log("🔍 Webhook: Sending email notification...");

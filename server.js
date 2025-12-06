@@ -52,8 +52,10 @@ app.use("/api/admin/withdrawals", require("./routes/adminWithdraw"));
 app.use("/api/admin/fix-rewards", require("./routes/fixDuplicateRewards"));
 app.use("/api/admin", require("./routes/adminTrustFunds"));
 app.use("/api/admin", require("./routes/adminUsers"));
+app.use("/api/admin", require("./routes/commissionSettings"));
 app.use("/api/bundles", require("./routes/bundles"));
 app.use("/api/notifications", require("./routes/notifications"));
+app.use("/api/points", require("./routes/points"));
 
 
 

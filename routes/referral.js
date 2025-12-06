@@ -33,15 +33,17 @@ router.get("/details", authenticateToken, async (req, res) => {
         };
 
         // Commission breakdown
+        const totalCommissionEarned = (user.directCommissionEarned || 0) + (user.treeCommissionEarned || 0);
         const commissionBreakdown = {
-            totalEarned: user.wallet,
+            totalEarned: totalCommissionEarned,  // Use sum of tracked commissions, not wallet
+            walletBalance: user.wallet,  // Actual wallet balance (may include old system payments)
             directCommission: user.directCommissionEarned || 0,
             treeCommission: user.treeCommissionEarned || 0,
-            directPercentage: user.wallet > 0 
-                ? ((user.directCommissionEarned || 0) / user.wallet * 100).toFixed(2)
+            directPercentage: totalCommissionEarned > 0 
+                ? ((user.directCommissionEarned || 0) / totalCommissionEarned * 100).toFixed(2)
                 : 0,
-            treePercentage: user.wallet > 0 
-                ? ((user.treeCommissionEarned || 0) / user.wallet * 100).toFixed(2)
+            treePercentage: totalCommissionEarned > 0 
+                ? ((user.treeCommissionEarned || 0) / totalCommissionEarned * 100).toFixed(2)
                 : 0
         };
 

@@ -93,11 +93,23 @@ async function loadBookDetails() {
    DISPLAY BOOK DETAILS
 ----------------------------------- */
 function displayBookDetails(book) {
+    // Store book globally for addToCart
+    window.currentBook = book;
+    
     document.getElementById("bookTitle").textContent = book.title;
     document.getElementById("bookAuthor").textContent = book.author;
-    document.getElementById("bookPrice").textContent = `$${parseFloat(book.price).toFixed(2)}`;
+    document.getElementById("bookPrice").textContent = `₹${parseFloat(book.price).toFixed(2)}`;
     document.getElementById("bookDescription").textContent =
         book.description || "No description available.";
+    
+    // Display reward points if available
+    if (book.rewardPoints && book.rewardPoints > 0) {
+        const priceElement = document.getElementById("bookPrice");
+        const pointsBadge = document.createElement("span");
+        pointsBadge.style.cssText = "background: #28a745; color: white; padding: 4px 10px; border-radius: 20px; font-size: 13px; margin-left: 10px; font-weight: 600;";
+        pointsBadge.textContent = `🎁 +${book.rewardPoints} Points`;
+        priceElement.parentNode.appendChild(pointsBadge);
+    }
 
     // Display weight and courier charge
     const weight = book.weight || 0.5;
@@ -539,14 +551,21 @@ function addToCart() {
         return alert("Already in cart!");
     }
 
+    // Use stored book data
+    const book = window.currentBook;
+    if (!book) {
+        return alert("Book data not loaded. Please refresh the page.");
+    }
+
     cart.push({
         id: bookId,
-        title: document.getElementById("bookTitle").textContent,
-        author: document.getElementById("bookAuthor").textContent,
-        price: parseFloat(document.getElementById("bookPrice").textContent.replace("₹", "")),
-        coverImage: document.getElementById("bookCover").src,
+        title: book.title,
+        author: book.author,
+        price: parseFloat(book.price),
+        coverImage: book.cover_image,
         quantity: 1,
-        weight: currentBook ? (currentBook.weight || 0.5) : 0.5
+        weight: book.weight || 0.5,
+        type: 'book'
     });
 
     saveCart(cart);

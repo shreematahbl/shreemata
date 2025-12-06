@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadProfile();
     loadOrders();
     loadAddress();
+    loadPoints();
 
     document.getElementById("logoutBtn").addEventListener("click", logout);
     document.getElementById("addressForm").addEventListener("submit", saveAddress);
@@ -39,8 +40,14 @@ function showSection(section) {
     document.getElementById("editSection").style.display = "none";
     document.getElementById("addressSection").style.display = "none";
     document.getElementById("ordersSection").style.display = "none";
+    document.getElementById("pointsSection").style.display = "none";
 
     document.getElementById(section + "Section").style.display = "block";
+    
+    // Reload points when section is shown
+    if (section === 'points') {
+        loadPoints();
+    }
 }
 
 /* -----------------------------------------
@@ -268,5 +275,118 @@ async function saveAddress(e) {
     } catch (err) {
         console.error("Address update error:", err);
         alert("Error updating address");
+    }
+}
+
+/* -----------------------------------------
+   LOAD POINTS
+----------------------------------------- */
+async function loadPoints() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+        // Load points balance
+        const balanceRes = await fetch(`${API}/points/balance`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const balanceData = await balanceRes.json();
+
+        document.getElementById("pointsWallet").textContent = balanceData.pointsWallet || 0;
+        document.getElementById("totalPointsEarned").textContent = balanceData.totalPointsEarned || 0;
+        document.getElementById("virtualReferralsCreated").textContent = balanceData.virtualReferralsCreated || 0;
+
+        // Enable/disable redeem button
+        const redeemBtn = document.getElementById("redeemBtn");
+        if (balanceData.canCreateVirtual) {
+            redeemBtn.disabled = false;
+            redeemBtn.textContent = "Redeem 100 Points for Virtual Referral";
+        } else {
+            redeemBtn.disabled = true;
+            redeemBtn.textContent = `Need ${100 - balanceData.pointsWallet} more points`;
+        }
+
+        // Load points history
+        const historyRes = await fetch(`${API}/points/history?page=1&limit=10`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const historyData = await historyRes.json();
+
+        const historyList = document.getElementById("pointsHistoryList");
+        historyList.innerHTML = "";
+
+        if (!historyData.transactions || historyData.transactions.length === 0) {
+            historyList.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    <p>No points transactions yet.</p>
+                </div>
+            `;
+            return;
+        }
+
+        historyData.transactions.forEach(tx => {
+            const div = document.createElement("div");
+            div.classList.add("points-transaction");
+            
+            const typeColor = tx.type === 'earned' ? '#28a745' : '#dc3545';
+            const sign = tx.type === 'earned' ? '+' : '';
+            
+            div.innerHTML = `
+                <div class="transaction-row">
+                    <div>
+                        <p style="font-weight: 600;">${tx.description}</p>
+                        <p style="font-size: 0.9em; color: #666;">${new Date(tx.createdAt).toLocaleString()}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="color: ${typeColor}; font-weight: 600; font-size: 1.2em;">${sign}${tx.points}</p>
+                        <p style="font-size: 0.9em; color: #666;">Balance: ${tx.balanceAfter}</p>
+                    </div>
+                </div>
+            `;
+            historyList.appendChild(div);
+        });
+
+    } catch (err) {
+        console.error("Error loading points:", err);
+        document.getElementById("pointsHistoryList").innerHTML = "<p style='color: #dc3545;'>Error loading points. Please try again.</p>";
+    }
+}
+
+/* -----------------------------------------
+   REDEEM VIRTUAL REFERRAL
+----------------------------------------- */
+async function redeemVirtualReferral() {
+    const token = localStorage.getItem("token");
+    if (!token) {
+        alert("Login required");
+        return;
+    }
+
+    if (!confirm("Are you sure you want to redeem 100 points for a virtual referral?")) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/points/redeem-virtual`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || "Failed to redeem points");
+            return;
+        }
+
+        alert(`Success! Virtual referral created: ${data.virtualUser.name}\nRemaining points: ${data.remainingPoints}`);
+        loadPoints(); // Reload points display
+
+    } catch (err) {
+        console.error("Redeem error:", err);
+        alert("Error redeeming points");
     }
 }

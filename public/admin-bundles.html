@@ -470,6 +470,12 @@
                     <input type="date" id="validUntil">
                 </div>
 
+                <div class="form-group">
+                    <label>Reward Points</label>
+                    <input type="number" id="rewardPoints" min="0" value="0" placeholder="0">
+                    <small>Points awarded to buyer on purchase</small>
+                </div>
+
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button type="submit" class="btn">Save Bundle</button>
                     <button type="button" onclick="closeModal()" class="btn" style="background: #666;">Cancel</button>
@@ -842,7 +848,8 @@
                     image: imageUrl,
                     bookIds,
                     bundlePrice: parseFloat(document.getElementById("bundlePrice").value),
-                    validUntil: document.getElementById("validUntil").value || null
+                    validUntil: document.getElementById("validUntil").value || null,
+                    rewardPoints: parseInt(document.getElementById("rewardPoints").value) || 0
                 };
 
                 console.log("Sending bundle data:", bundleData);

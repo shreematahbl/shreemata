@@ -209,6 +209,7 @@ async function editBook(bookId) {
     document.getElementById('author').value = book.author;
     document.getElementById('price').value = book.price;
     document.getElementById('weight').value = book.weight || 0.5;
+    document.getElementById('rewardPoints').value = book.rewardPoints || 0;
     document.getElementById('description').value = book.description;
     document.getElementById('category').value = book.category;
 
@@ -245,6 +246,7 @@ async function handleFormSubmit(e) {
     formData.append('description', document.getElementById('description').value);
     formData.append('category', document.getElementById('category').value);
     formData.append('weight', document.getElementById('weight').value);
+    formData.append('rewardPoints', document.getElementById('rewardPoints').value);
 
     const cover = document.getElementById('coverImage').files[0];
     if (cover) formData.append('coverImage', cover);

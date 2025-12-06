@@ -32,6 +32,7 @@
             <button onclick="showSection('edit')">Edit Profile</button>
             <button onclick="showSection('address')">Delivery Address</button>
             <button onclick="showSection('orders')">Order History</button>
+            <button onclick="showSection('points')">Points & Rewards</button>
             <button onclick="logout()">Logout</button>
         </div>
 
@@ -77,6 +78,38 @@
         <div id="ordersSection" class="account-section" style="display:none;">
             <h2>Order History</h2>
             <div id="ordersList">Loading...</div>
+        </div>
+
+        <div id="pointsSection" class="account-section" style="display:none;">
+            <h2>Points & Rewards</h2>
+            
+            <div class="points-summary">
+                <div class="points-card">
+                    <h3>Available Points</h3>
+                    <p class="points-value" id="pointsWallet">0</p>
+                </div>
+                <div class="points-card">
+                    <h3>Total Earned</h3>
+                    <p class="points-value" id="totalPointsEarned">0</p>
+                </div>
+                <div class="points-card">
+                    <h3>Virtual Referrals</h3>
+                    <p class="points-value" id="virtualReferralsCreated">0</p>
+                </div>
+            </div>
+
+            <div class="redeem-section">
+                <h3>Redeem Points</h3>
+                <p>You can redeem 100 points to create a virtual referral in your tree.</p>
+                <button class="btn-primary" id="redeemBtn" onclick="redeemVirtualReferral()">
+                    Redeem 100 Points for Virtual Referral
+                </button>
+            </div>
+
+            <div class="points-history">
+                <h3>Points History</h3>
+                <div id="pointsHistoryList">Loading...</div>
+            </div>
         </div>
 
     </div>

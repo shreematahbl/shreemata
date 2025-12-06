@@ -11,7 +11,14 @@ const bookSchema = new mongoose.Schema({
   category: { type: String, default: 'uncategorized' }, // store category slug
   weight: { type: Number, default: 0.5 }, // weight in kg, default 0.5kg
   ratings_average: { type: Number, default: 0 }, // will be used later
-  ratings_count: { type: Number, default: 0 }
+  ratings_count: { type: Number, default: 0 },
+  
+  // Points System
+  rewardPoints: {
+    type: Number,
+    default: 0,
+    min: 0
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Book', bookSchema);

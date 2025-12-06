@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const CommissionTransaction = require('../models/CommissionTransaction');
 const TrustFund = require('../models/TrustFund');
+const CommissionSettings = require('../models/CommissionSettings');
 const mongoose = require('mongoose');
 
 /**
@@ -84,6 +85,9 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
   session.startTransaction();
 
   try {
+    // Get commission settings
+    const settings = await CommissionSettings.getSettings();
+    
     const purchaser = await User.findById(purchaserId).session(session);
     
     if (!purchaser) {
@@ -98,16 +102,16 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
       status: 'pending'
     });
     
-    // 1. Allocate 3% to Trust Fund
-    const trustFundAmount = orderAmount * 0.03;
+    // 1. Allocate Trust Fund (dynamic %)
+    const trustFundAmount = orderAmount * (settings.trustFundPercent / 100);
     if (trustFundAmount < 0) {
       throw new Error('Trust fund amount cannot be negative');
     }
     await addToTrustFund('trust', trustFundAmount, orderId, 'order_allocation', 'Order commission allocation', session);
     transaction.trustFundAmount = trustFundAmount;
     
-    // 2. Calculate and credit Direct Commission (3%)
-    const directCommission = orderAmount * 0.03;
+    // 2. Calculate and credit Direct Commission (dynamic %)
+    const directCommission = orderAmount * (settings.directCommissionPercent / 100);
     if (directCommission < 0) {
       throw new Error('Direct commission amount cannot be negative');
     }
@@ -151,26 +155,25 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
       transaction.trustFundAmount += directCommission;
     }
     
-    // 3. Calculate 1% for Development Trust Fund (will be added later with remainder)
-    const devTrustBaseAmount = orderAmount * 0.01;
+    // 3. Calculate Development Trust Fund (dynamic %, will be added later with remainder)
+    const devTrustBaseAmount = orderAmount * (settings.developmentFundPercent / 100);
     if (devTrustBaseAmount < 0) {
       throw new Error('Development trust fund amount cannot be negative');
     }
     transaction.devTrustFundAmount = devTrustBaseAmount;
     
-    // 4. Distribute Tree Commissions (3% total)
-    const treeCommissionPool = orderAmount * 0.03;
+    // 4. Distribute Tree Commissions (dynamic % total)
+    const treeCommissionPool = orderAmount * (settings.treeCommissionPoolPercent / 100);
     let remainingPool = treeCommissionPool;
     let currentParent = purchaser.treeParent;
-    let level = 1;
-    let percentage = 1.5; // Start with 1.5% for first level
-    const maxLevels = 20; // Safety limit to prevent infinite loops
+    let levelIndex = 0;
+    const maxLevels = settings.treeCommissionLevels.length || 20; // Use configured levels
     
-    while (currentParent && remainingPool > 0.01 && level <= maxLevels) {
+    while (currentParent && remainingPool > 0.01 && levelIndex < maxLevels) {
       const parent = await User.findById(currentParent).session(session);
       
       if (!parent) {
-        console.log(`Tree parent not found at level ${level}, stopping tree commission distribution`);
+        console.log(`Tree parent not found at level ${levelIndex + 1}, stopping tree commission distribution`);
         break;
       }
       
@@ -181,11 +184,18 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
       if (isDirectReferrer) {
         console.log(`Skipping tree commission for ${parent.email} - they are the direct referrer`);
         currentParent = parent.treeParent;
-        level++;
-        percentage = percentage / 2;
+        levelIndex++;
         continue;
       }
       
+      // Get percentage for this level from settings
+      const levelConfig = settings.treeCommissionLevels[levelIndex];
+      if (!levelConfig) {
+        console.log(`No commission configured for level ${levelIndex + 1}, stopping`);
+        break;
+      }
+      
+      const percentage = levelConfig.percentage;
       const commissionAmount = orderAmount * (percentage / 100);
       
       // Validate commission amount
@@ -219,26 +229,25 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
           
           transaction.treeCommissions.push({
             recipient: parent._id,
-            level,
+            level: levelIndex + 1,
             percentage,
             amount: commissionAmount
           });
           
-          console.log(`Tree commission of ${commissionAmount} (${percentage}%) credited to ${parent.email} at level ${level - 1}`);
+          console.log(`Tree commission of ${commissionAmount} (${percentage}%) credited to ${parent.email} at level ${levelIndex + 1}`);
         }
         
         remainingPool -= commissionAmount;
         currentParent = parent.treeParent;
-        level++;
-        percentage = percentage / 2; // Halve for next level
+        levelIndex++;
       } else {
         console.log(`Insufficient pool remaining (${remainingPool}) for commission amount ${commissionAmount}`);
         break;
       }
     }
 
-    if (level > maxLevels) {
-      console.warn(`Reached maximum tree level limit (${maxLevels}), stopping distribution`);
+    if (levelIndex >= maxLevels) {
+      console.warn(`Reached maximum configured tree levels (${maxLevels}), stopping distribution`);
     }
     
     // 5. Add Development Trust Fund (1% + any remainder from tree commission)
@@ -255,7 +264,7 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
         totalDevFundAmount, 
         orderId, 
         'order_allocation', 
-        `Order commission: 1% (₹${devTrustBaseAmount.toFixed(2)}) + Tree remainder (₹${remainingPool.toFixed(2)})`, 
+        `Order commission: ${settings.developmentFundPercent}% (₹${devTrustBaseAmount.toFixed(2)}) + Tree remainder (₹${remainingPool.toFixed(2)})`, 
         session
       );
       console.log(`Development Trust Fund: ₹${totalDevFundAmount.toFixed(2)} (1% + remainder)`);

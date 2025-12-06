@@ -212,7 +212,7 @@ function createBookCard(book) {
         <img src="${coverImage}" class="book-cover" />
         <h3>${book.title}</h3>
         <p class="book-author">by ${book.author}</p>
-        <p class="book-price">$${parseFloat(book.price).toFixed(2)}</p>
+        <p class="book-price">₹${parseFloat(book.price).toFixed(2)} ${book.rewardPoints && book.rewardPoints > 0 ? `<span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin-left: 5px; font-weight: 600;">🎁 +${book.rewardPoints}</span>` : ''}</p>
         <div class="book-actions">
             <button class="btn-secondary" onclick="previewBook('${book._id}')">Preview</button>
             <button class="btn-primary" onclick="handleBuyClick('${book._id}')">Buy</button>
@@ -383,7 +383,7 @@ document.addEventListener("click", (e) => {
 
         const title = card.querySelector("h3").textContent;
         const author = card.querySelector(".book-author").textContent.replace("by ", "");
-        const price = parseFloat(card.querySelector(".book-price").textContent.replace("$", ""));
+        const price = parseFloat(card.querySelector(".book-price").textContent.replace("₹", "").split("🎁")[0].trim());
         const coverImage = card.querySelector("img").src;
 
         let cart = getCart();

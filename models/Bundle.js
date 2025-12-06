@@ -45,6 +45,13 @@ const bundleSchema = new mongoose.Schema({
         default: 0 // Will be calculated from books
     },
     
+    // Points System
+    rewardPoints: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    
     validUntil: { 
         type: Date // Optional expiry date
     }

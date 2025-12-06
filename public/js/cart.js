@@ -39,11 +39,13 @@ async function loadCart() {
 
     let total = 0;
     let totalWeight = 0;
+    let totalPoints = 0;
 
     cart.forEach(item => {
         total += item.price * item.quantity;
         const itemWeight = (item.weight || 0.5) * item.quantity;
         totalWeight += itemWeight;
+        totalPoints += (item.rewardPoints || 0) * item.quantity;
 
         const row = document.createElement("div");
         row.className = "cart-item";
@@ -54,14 +56,21 @@ async function loadCart() {
             imageUrl = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="250" height="300"%3E%3Crect fill="%23ddd" width="250" height="300"/%3E%3Ctext fill="%23999" font-family="Arial" font-size="20" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3E' + (item.isBundle ? 'Bundle' : 'Book') + '%3C/text%3E%3C/svg%3E';
         }
 
+        // Calculate points for this item
+        const itemPoints = (item.rewardPoints || 0) * item.quantity;
+        const pointsBadge = itemPoints > 0 
+            ? `<p style="font-size: 13px; color: #28a745; margin: 5px 0; font-weight: 600;">🎁 +${itemPoints} Points</p>`
+            : '';
+
         row.innerHTML = `
             <img src="${imageUrl}" class="cart-img">
 
             <div class="cart-info">
                 <h3>${item.title}${item.isBundle ? ' <span style="background: #ff9800; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 5px;">BUNDLE</span>' : ''}</h3>
                 <p>by ${item.author}</p>
-                <p class="cart-price">₹${item.price.toFixed(2)}</p>
+                <p class="cart-price">₹${(item.price || 0).toFixed(2)}</p>
                 <p style="font-size: 13px; color: #ff9800; margin: 5px 0;">📦 ${(item.weight || 0.5).toFixed(2)} kg × ${item.quantity} = ${(itemWeight).toFixed(2)} kg</p>
+                ${pointsBadge}
                 
                 <div class="cart-qty">
                     <button class="qty-btn" data-id="${item.id || item.bundleId}" data-action="minus">-</button>
@@ -84,11 +93,24 @@ async function loadCart() {
 
     // Update cart summary with breakdown
     const cartTotalEl = document.getElementById("cartTotal");
+    const pointsDisplay = totalPoints > 0 
+        ? `<div style="margin: 10px 0; padding: 12px; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-radius: 8px; border-left: 4px solid #28a745;">
+               <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                   <span style="font-size: 24px;">🎁</span>
+                   <span style="font-weight: 700; color: #155724; font-size: 18px;">You'll earn ${totalPoints} Points!</span>
+               </div>
+               <div style="font-size: 12px; color: #155724; margin-top: 5px; text-align: right;">
+                   Redeem 100 points for a virtual referral
+               </div>
+           </div>`
+        : '';
+    
     cartTotalEl.innerHTML = `
         <div style="text-align: right; margin-bottom: 10px;">
             <div style="margin: 5px 0;">Subtotal: ₹${total.toFixed(2)}</div>
             <div style="margin: 5px 0; color: #666;">Total Weight: ${totalWeight.toFixed(2)} kg</div>
             <div style="margin: 5px 0; color: #666;">Courier Charge: ₹${courierCharge.toFixed(2)}</div>
+            ${pointsDisplay}
             <div style="border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; font-size: 1.2em; font-weight: bold;">
                 Grand Total: ₹${grandTotal.toFixed(2)}
             </div>
@@ -110,49 +132,64 @@ async function fetchBookWeights(cart) {
     const API = window.API_URL || '';
     
     for (let item of cart) {
-        // Fetch weight for individual books
-        if (!item.weight && item.id && !item.isBundle) {
+        // Fetch weight and reward points for individual books
+        if (item.id && !item.isBundle) {
             try {
                 const res = await fetch(`${API}/books/${item.id}`);
                 const data = await res.json();
-                if (data.book && data.book.weight) {
-                    item.weight = data.book.weight;
+                if (data.book) {
+                    if (data.book.weight) {
+                        item.weight = data.book.weight;
+                    }
+                    if (data.book.rewardPoints !== undefined) {
+                        item.rewardPoints = data.book.rewardPoints;
+                    }
                 }
             } catch (err) {
-                console.error("Error fetching book weight:", err);
-                item.weight = 0.5; // Default fallback
+                console.error("Error fetching book data:", err);
+                item.weight = item.weight || 0.5; // Default fallback
+                item.rewardPoints = item.rewardPoints || 0;
             }
         }
         
-        // Fetch weight for bundles
-        if (!item.weight && item.bundleId && item.isBundle) {
+        // Fetch weight and reward points for bundles
+        if (item.bundleId && item.isBundle) {
             try {
                 const res = await fetch(`${API}/bundles/${item.bundleId}`);
                 const data = await res.json();
-                if (data.bundle && data.bundle.weight) {
-                    item.weight = data.bundle.weight;
-                } else if (data.bundle && data.bundle.books) {
-                    // Calculate from books if weight not stored
-                    item.weight = data.bundle.books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
+                if (data.bundle) {
+                    if (data.bundle.weight) {
+                        item.weight = data.bundle.weight;
+                    } else if (data.bundle.books) {
+                        // Calculate from books if weight not stored
+                        item.weight = data.bundle.books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
+                    }
+                    if (data.bundle.rewardPoints !== undefined) {
+                        item.rewardPoints = data.bundle.rewardPoints;
+                    }
                 }
             } catch (err) {
-                console.error("Error fetching bundle weight:", err);
+                console.error("Error fetching bundle data:", err);
                 // Fallback: estimate based on number of books if available
                 if (item.books && item.books.length) {
                     item.weight = item.books.length * 0.5;
                 } else {
-                    item.weight = 2; // Default bundle weight
+                    item.weight = item.weight || 2; // Default bundle weight
                 }
+                item.rewardPoints = item.rewardPoints || 0;
             }
         }
         
-        // Final fallback if still no weight
+        // Final fallback if still no weight or points
         if (!item.weight) {
             item.weight = item.isBundle ? 2 : 0.5;
         }
+        if (item.rewardPoints === undefined) {
+            item.rewardPoints = 0;
+        }
     }
     
-    // Update cart in localStorage with weights
+    // Update cart in localStorage with weights and points
     saveCart(cart);
 }
 

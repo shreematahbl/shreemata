@@ -97,7 +97,7 @@ router.get("/:id", async (req, res) => {
 ------------------------------------------- */
 router.post("/", authenticateToken, isAdmin, uploadImages, async (req, res) => {
   try {
-    const { title, author, price, description, category, weight } = req.body;
+    const { title, author, price, description, category, weight, rewardPoints } = req.body;
 
     if (!title || !author || !price) {
       return res.status(400).json({ error: "Title, author, and price are required" });
@@ -119,7 +119,8 @@ router.post("/", authenticateToken, isAdmin, uploadImages, async (req, res) => {
       cover_image: coverImage,
       preview_images: previewImages,
       category: category || "uncategorized",
-      weight: weight || 0.5
+      weight: weight || 0.5,
+      rewardPoints: rewardPoints || 0
     });
 
     res.status(201).json({ message: "Book added", book });
@@ -144,6 +145,7 @@ router.put("/:id", authenticateToken, isAdmin, uploadImages, async (req, res) =>
     book.description = req.body.description || book.description;
     book.category = req.body.category || book.category;
     book.weight = req.body.weight !== undefined ? req.body.weight : book.weight;
+    book.rewardPoints = req.body.rewardPoints !== undefined ? req.body.rewardPoints : book.rewardPoints;
 
     if (req.files["coverImage"]) {
       book.cover_image = req.files["coverImage"][0].path;
