@@ -16,8 +16,16 @@ const PORT = process.env.PORT || 3000;
 // Connect DB
 connectDB();
 
-// CORS
-app.use(cors());
+// CORS - Allow requests from main domain and API subdomain
+app.use(cors({
+  origin: [
+    'https://shreemata.com',
+    'https://www.shreemata.com',
+    'https://api.shreemata.com',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 
 // =====================================
 // 1️⃣ RAW BODY FOR RAZORPAY WEBHOOK 
@@ -75,8 +83,24 @@ app.get('/api/health', (req, res) => {
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// SPA fallback
+// Global error handler for API routes
+app.use((err, req, res, next) => {
+  // Only handle API routes with JSON errors
+  if (req.path.startsWith('/api/')) {
+    console.error('API Error:', err);
+    return res.status(err.status || 500).json({
+      error: err.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
+  next(err);
+});
+
+// SPA fallback (only for non-API routes)
 app.use((req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 

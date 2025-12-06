@@ -101,37 +101,57 @@ router.get("/:id", async (req, res) => {
    ADD NEW BOOK (ADMIN ONLY)
 ------------------------------------------- */
 router.post("/", authenticateToken, isAdmin, (req, res, next) => {
+  console.log('📤 POST /api/books - Starting upload...');
   uploadImages(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       // Multer error (file too large, etc.)
-      console.error("Multer error:", err);
+      console.error("❌ Multer error:", err);
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: "File too large. Maximum size is 10MB per file." });
       }
       return res.status(400).json({ error: `Upload error: ${err.message}` });
     } else if (err) {
-      // Other errors
-      console.error("Upload error:", err);
-      return res.status(500).json({ error: `Upload failed: ${err.message}` });
+      // Other errors (Cloudinary, network, etc.)
+      console.error("❌ Upload error:", err);
+      return res.status(500).json({ 
+        error: "Upload failed", 
+        details: err.message,
+        hint: "Check Cloudinary credentials and network connection"
+      });
     }
     // No error, proceed
+    console.log('✅ Upload successful, processing book data...');
     next();
   });
 }, async (req, res) => {
   try {
     const { title, author, price, description, category, weight, rewardPoints } = req.body;
+    console.log('📝 Book data:', { title, author, price, category });
 
+    // Validate required fields
     if (!title || !author || !price) {
-      return res.status(400).json({ error: "Title, author, and price are required" });
+      console.log('❌ Missing required fields');
+      return res.status(400).json({ 
+        error: "Missing required fields", 
+        details: "Title, author, and price are required" 
+      });
     }
 
-    const coverImage = req.files["coverImage"]
-      ? req.files["coverImage"][0].path
-      : "";
+    // Validate that files were uploaded
+    if (!req.files || !req.files["coverImage"]) {
+      console.log('❌ No cover image uploaded');
+      return res.status(400).json({ 
+        error: "Cover image is required",
+        details: "Please upload a cover image for the book"
+      });
+    }
 
+    const coverImage = req.files["coverImage"][0].path;
     const previewImages = req.files["previewImages"]
       ? req.files["previewImages"].map(f => f.path)
       : [];
+
+    console.log('🖼️ Images:', { coverImage, previewCount: previewImages.length });
 
     const book = await Book.create({
       title,
@@ -145,10 +165,14 @@ router.post("/", authenticateToken, isAdmin, (req, res, next) => {
       rewardPoints: rewardPoints || 0
     });
 
-    res.status(201).json({ message: "Book added", book });
+    console.log('✅ Book created successfully:', book._id);
+    res.status(201).json({ message: "Book added successfully", book });
   } catch (err) {
-    console.error("Error adding book:", err);
-    res.status(500).json({ error: "Error adding book", details: err.message });
+    console.error("❌ Error adding book:", err);
+    res.status(500).json({ 
+      error: "Error adding book", 
+      details: err.message 
+    });
   }
 });
 
@@ -165,7 +189,11 @@ router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
       return res.status(400).json({ error: `Upload error: ${err.message}` });
     } else if (err) {
       console.error("Upload error:", err);
-      return res.status(500).json({ error: `Upload failed: ${err.message}` });
+      return res.status(500).json({ 
+        error: "Upload failed", 
+        details: err.message,
+        hint: "Check Cloudinary credentials and network connection"
+      });
     }
     next();
   });
@@ -183,20 +211,23 @@ router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
     book.weight = req.body.weight !== undefined ? req.body.weight : book.weight;
     book.rewardPoints = req.body.rewardPoints !== undefined ? req.body.rewardPoints : book.rewardPoints;
 
-    if (req.files["coverImage"]) {
+    if (req.files && req.files["coverImage"]) {
       book.cover_image = req.files["coverImage"][0].path;
     }
 
-    if (req.files["previewImages"]) {
+    if (req.files && req.files["previewImages"]) {
       book.preview_images = req.files["previewImages"].map(f => f.path);
     }
 
     await book.save();
-    res.json({ message: "Book updated", book });
+    res.json({ message: "Book updated successfully", book });
 
   } catch (err) {
     console.error("Error updating book:", err);
-    res.status(500).json({ error: "Error updating book" });
+    res.status(500).json({ 
+      error: "Error updating book", 
+      details: err.message 
+    });
   }
 });
 
