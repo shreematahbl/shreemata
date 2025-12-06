@@ -102,13 +102,13 @@ function displayBookDetails(book) {
     document.getElementById("bookDescription").textContent =
         book.description || "No description available.";
     
-    // Display reward points if available
+    // Display reward points if available - BIG and PROMINENT
     if (book.rewardPoints && book.rewardPoints > 0) {
         const priceElement = document.getElementById("bookPrice");
-        const pointsBadge = document.createElement("span");
-        pointsBadge.style.cssText = "background: #28a745; color: white; padding: 4px 10px; border-radius: 20px; font-size: 13px; margin-left: 10px; font-weight: 600;";
-        pointsBadge.textContent = `🎁 +${book.rewardPoints} Points`;
-        priceElement.parentNode.appendChild(pointsBadge);
+        const pointsBadge = document.createElement("div");
+        pointsBadge.style.cssText = "background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 15px 20px; border-radius: 12px; font-size: 18px; margin: 15px 0; font-weight: 700; text-align: center; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3); display: flex; align-items: center; justify-content: center; gap: 10px;";
+        pointsBadge.innerHTML = `<span style="font-size: 28px;">🎁</span><span>Earn ${book.rewardPoints} Points with this purchase!</span>`;
+        priceElement.parentNode.insertBefore(pointsBadge, priceElement.nextSibling);
     }
 
     // Display weight and courier charge

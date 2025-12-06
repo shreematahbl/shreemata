@@ -208,11 +208,20 @@ function createBookCard(book) {
 
     const coverImage = book.cover_image || "https://via.placeholder.com/250x300?text=No+Cover";
 
+    // Create prominent points badge if book has reward points
+    const pointsBadge = book.rewardPoints && book.rewardPoints > 0 
+        ? `<div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 8px 12px; border-radius: 8px; margin: 10px 0; text-align: center; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+               <span style="font-size: 18px;">🎁</span>
+               <span>Earn ${book.rewardPoints} Points</span>
+           </div>`
+        : '';
+
     card.innerHTML = `
         <img src="${coverImage}" class="book-cover" />
         <h3>${book.title}</h3>
         <p class="book-author">by ${book.author}</p>
-        <p class="book-price">₹${parseFloat(book.price).toFixed(2)} ${book.rewardPoints && book.rewardPoints > 0 ? `<span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin-left: 5px; font-weight: 600;">🎁 +${book.rewardPoints}</span>` : ''}</p>
+        <p class="book-price">₹${parseFloat(book.price).toFixed(2)}</p>
+        ${pointsBadge}
         <div class="book-actions">
             <button class="btn-secondary" onclick="previewBook('${book._id}')">Preview</button>
             <button class="btn-primary" onclick="handleBuyClick('${book._id}')">Buy</button>
