@@ -21,7 +21,12 @@ const storage = new CloudinaryStorage({
   })
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB per file
+  }
+});
 
 const uploadImages = upload.fields([
   { name: "coverImage", maxCount: 1 },
@@ -95,7 +100,24 @@ router.get("/:id", async (req, res) => {
 /* -------------------------------------------
    ADD NEW BOOK (ADMIN ONLY)
 ------------------------------------------- */
-router.post("/", authenticateToken, isAdmin, uploadImages, async (req, res) => {
+router.post("/", authenticateToken, isAdmin, (req, res, next) => {
+  uploadImages(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      // Multer error (file too large, etc.)
+      console.error("Multer error:", err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: "File too large. Maximum size is 10MB per file." });
+      }
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    } else if (err) {
+      // Other errors
+      console.error("Upload error:", err);
+      return res.status(500).json({ error: `Upload failed: ${err.message}` });
+    }
+    // No error, proceed
+    next();
+  });
+}, async (req, res) => {
   try {
     const { title, author, price, description, category, weight, rewardPoints } = req.body;
 
@@ -126,14 +148,28 @@ router.post("/", authenticateToken, isAdmin, uploadImages, async (req, res) => {
     res.status(201).json({ message: "Book added", book });
   } catch (err) {
     console.error("Error adding book:", err);
-    res.status(500).json({ error: "Error adding book" });
+    res.status(500).json({ error: "Error adding book", details: err.message });
   }
 });
 
 /* -------------------------------------------
    UPDATE BOOK (ADMIN ONLY)
 ------------------------------------------- */
-router.put("/:id", authenticateToken, isAdmin, uploadImages, async (req, res) => {
+router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
+  uploadImages(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      console.error("Multer error:", err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: "File too large. Maximum size is 10MB per file." });
+      }
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    } else if (err) {
+      console.error("Upload error:", err);
+      return res.status(500).json({ error: `Upload failed: ${err.message}` });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
 

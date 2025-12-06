@@ -266,12 +266,24 @@ async function handleFormSubmit(e) {
         body: formData
     });
 
+    // Check if response is JSON
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', text.substring(0, 200));
+        alert('Server error: Received invalid response. Please check:\n- File sizes (max 10MB per file)\n- Image formats (JPG, PNG, WEBP only)\n- Server is running properly');
+        return;
+    }
+
     const data = await res.json();
 
     if (res.ok) {
         alert(data.message);
         resetForm();
         loadBooks();
+    } else {
+        // Show specific error message
+        alert(`Error: ${data.error || 'Failed to save book'}\n${data.details || ''}`);
     }
 }
 
