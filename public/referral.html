@@ -247,6 +247,29 @@
             color: #666;
         }
 
+        .filter-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            color: #666;
+        }
+
+        .filter-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
         @media (max-width: 768px) {
             .page-header h1 {
                 font-size: 32px;
@@ -312,9 +335,15 @@
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-icon">🎁</div>
-                    <div class="stat-value">3%</div>
-                    <div class="stat-label">Commission Rate</div>
+                    <div class="stat-icon">🌳</div>
+                    <div class="stat-value">L<span id="treeLevel">0</span></div>
+                    <div class="stat-label">Your Tree Level</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-value"><span id="treeChildrenCount">0</span></div>
+                    <div class="stat-label">Tree Children</div>
                 </div>
             </div>
 
@@ -374,24 +403,60 @@
             </div>
 
             <div class="referral-card">
-                <h2>📊 Referral History & Commission</h2>
-                <p style="color: #666; margin-bottom: 20px;">Track all your referrals and earnings</p>
+                <h2>💰 Commission Breakdown</h2>
+                <p style="color: #666; margin-bottom: 20px;">See how your earnings are distributed</p>
                 
-                <div id="historyLoading" style="text-align: center; padding: 20px; color: #666;">
-                    Loading history...
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Direct Commission</div>
+                        <div style="font-size: 28px; font-weight: bold;">₹<span id="directCommission">0</span></div>
+                        <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;"><span id="directPercentage">0</span>% of total</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 20px; border-radius: 12px; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Tree Commission</div>
+                        <div style="font-size: 28px; font-weight: bold;">₹<span id="treeCommission">0</span></div>
+                        <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;"><span id="treePercentage">0</span>% of total</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="referral-card">
+                <h2>🌳 Your Tree Position</h2>
+                <p style="color: #666; margin-bottom: 20px;">Your position in the referral tree structure</p>
+                
+                <div id="treePositionInfo" style="background: #f8f9fa; padding: 20px; border-radius: 12px;">
+                    <div style="display: grid; gap: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 8px;">
+                            <span style="color: #666; font-weight: 600;">Tree Level:</span>
+                            <span style="color: #667eea; font-weight: bold; font-size: 18px;">Level <span id="userTreeLevel">0</span></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 8px;">
+                            <span style="color: #666; font-weight: 600;">Tree Parent:</span>
+                            <span id="treeParentInfo" style="color: #333; font-weight: 500;">None</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 8px;">
+                            <span style="color: #666; font-weight: 600;">Direct Tree Children:</span>
+                            <span style="color: #28a745; font-weight: bold; font-size: 18px;"><span id="directTreeChildren">0</span> / 5</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="referral-card">
+                <h2>👥 Your Referrals</h2>
+                <p style="color: #666; margin-bottom: 20px;">People who joined using your referral code</p>
+                
+                <div id="referralsLoading" style="text-align: center; padding: 20px; color: #666;">
+                    Loading referrals...
                 </div>
                 
-                <div id="historyContent" style="display: none;">
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                            <div>
-                                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Total Referrals</div>
-                                <div style="font-size: 28px; font-weight: bold; color: #667eea;" id="totalReferrals">0</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Total Commission Earned</div>
-                                <div style="font-size: 28px; font-weight: bold; color: #28a745;" id="totalCommission">₹0</div>
-                            </div>
+                <div id="referralsContent" style="display: none;">
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: inline-flex; gap: 10px; margin-bottom: 15px;">
+                            <button onclick="filterReferrals('all')" id="filterAll" class="filter-btn active">All (<span id="countAll">0</span>)</button>
+                            <button onclick="filterReferrals('direct')" id="filterDirect" class="filter-btn">Direct Placement (<span id="countDirect">0</span>)</button>
+                            <button onclick="filterReferrals('spillover')" id="filterSpillover" class="filter-btn">Spillover (<span id="countSpillover">0</span>)</button>
                         </div>
                     </div>
                     
@@ -399,29 +464,32 @@
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead>
                                 <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
-                                    <th style="padding: 12px; text-align: left; font-size: 13px; color: #666;">User</th>
+                                    <th style="padding: 12px; text-align: left; font-size: 13px; color: #666;">Name</th>
                                     <th style="padding: 12px; text-align: left; font-size: 13px; color: #666;">Email</th>
-                                    <th style="padding: 12px; text-align: center; font-size: 13px; color: #666;">Level</th>
-                                    <th style="padding: 12px; text-align: right; font-size: 13px; color: #666;">Commission</th>
-                                    <th style="padding: 12px; text-align: center; font-size: 13px; color: #666;">Status</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 13px; color: #666;">Tree Level</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 13px; color: #666;">Placement</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 13px; color: #666;">Joined</th>
                                 </tr>
                             </thead>
-                            <tbody id="historyTableBody">
+                            <tbody id="referralsTableBody">
                             </tbody>
                         </table>
                     </div>
                     
-                    <div id="noHistory" style="display: none; text-align: center; padding: 40px; color: #999;">
-                        <div style="font-size: 48px; margin-bottom: 10px;">📋</div>
-                        <p>No referral history yet. Start sharing your referral code!</p>
+                    <div id="noReferrals" style="display: none; text-align: center; padding: 40px; color: #999;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">👥</div>
+                        <p>No referrals yet. Start sharing your referral code!</p>
                     </div>
                 </div>
             </div>
 
             <div class="referral-card" style="text-align: center;">
-                <h2>🌳 View Your Referral Network</h2>
-                <p style="color: #666; margin-bottom: 20px;">See your complete referral tree and track your network growth</p>
-                <a href="referral-tree.html" class="tree-btn">View Referral Tree</a>
+                <h2>📊 View Detailed Reports</h2>
+                <p style="color: #666; margin-bottom: 20px;">Access your complete referral network and commission history</p>
+                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                    <a href="referral-tree.html" class="tree-btn">🌳 View Referral Tree</a>
+                    <a href="commission-history.html" class="tree-btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">💰 Commission History</a>
+                </div>
             </div>
         </div>
     </main>

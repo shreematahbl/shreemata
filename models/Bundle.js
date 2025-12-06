@@ -40,17 +40,34 @@ const bundleSchema = new mongoose.Schema({
         type: String // Bundle cover image
     },
     
+    weight: {
+        type: Number,
+        default: 0 // Will be calculated from books
+    },
+    
     validUntil: { 
         type: Date // Optional expiry date
     }
 
 }, { timestamps: true });
 
-// Calculate discount percentage before saving
-bundleSchema.pre('save', function(next) {
+// Calculate discount percentage and weight before saving
+bundleSchema.pre('save', async function(next) {
     if (this.originalPrice && this.bundlePrice) {
         this.discount = Math.round(((this.originalPrice - this.bundlePrice) / this.originalPrice) * 100);
     }
+    
+    // Calculate total weight from books if books array is populated
+    if (this.books && this.books.length > 0 && this.isModified('books')) {
+        try {
+            const Book = require('./Book');
+            const books = await Book.find({ _id: { $in: this.books } });
+            this.weight = books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
+        } catch (err) {
+            console.error('Error calculating bundle weight:', err);
+        }
+    }
+    
     next();
 });
 

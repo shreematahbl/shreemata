@@ -335,7 +335,7 @@ async function addBundleToCart(bundleId) {
         const data = await res.json();
         const bundle = data.bundle;
 
-        let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+        let cart = getCart();
 
         // Check if bundle already in cart
         if (cart.find(item => item.bundleId === bundleId)) {
@@ -354,7 +354,7 @@ async function addBundleToCart(bundleId) {
             coverImage: bundle.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="250" height="300"%3E%3Crect fill="%23ddd" width="250" height="300"/%3E%3Ctext fill="%23999" font-family="Arial" font-size="20" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EBundle%3C/text%3E%3C/svg%3E'
         });
 
-        localStorage.setItem("cart", JSON.stringify(cart));
+        saveCart(cart);
         alert(`Bundle "${bundle.name}" added to cart!`);
         
         // Update cart count if exists
@@ -366,7 +366,7 @@ async function addBundleToCart(bundleId) {
 }
 
 function updateCartCount() {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = getCart();
     const cartCount = document.getElementById("cartCount");
     if (cartCount) {
         cartCount.textContent = cart.length;
@@ -386,14 +386,14 @@ document.addEventListener("click", (e) => {
         const price = parseFloat(card.querySelector(".book-price").textContent.replace("$", ""));
         const coverImage = card.querySelector("img").src;
 
-        let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+        let cart = getCart();
 
         if (cart.find((item) => item.id === bookId)) {
             return alert("Already in cart!");
         }
 
         cart.push({ id: bookId, title, author, price, coverImage, quantity: 1 });
-        localStorage.setItem("cart", JSON.stringify(cart));
+        saveCart(cart);
         alert("Book added to cart!");
         updateCartCount();
     }

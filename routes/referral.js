@@ -1,5 +1,6 @@
 const express = require("express");
 const User = require("../models/User");
+const CommissionTransaction = require("../models/CommissionTransaction");
 const { authenticateToken } = require("../middleware/auth");
 const sendMail = require("../utils/sendMail");
 
@@ -7,98 +8,104 @@ const router = express.Router();
 
 router.get("/details", authenticateToken, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id);
-        const Order = require("../models/Order");
+        const user = await User.findById(req.user.id)
+            .populate('treeParent', 'name email referralCode')
+            .populate('treeChildren', 'name email referralCode treeLevel');
 
-        // Find all people referred by this user (Level 1)
-        const referredUsers = await User.find({ referredBy: user.referralCode })
-            .select("name email firstPurchaseDone createdAt referralCode");
+        // Tree placement information
+        const treePlacement = {
+            treeLevel: user.treeLevel,
+            treePosition: user.treePosition,
+            treeParent: user.treeParent ? {
+                id: user.treeParent._id,
+                name: user.treeParent.name,
+                email: user.treeParent.email,
+                referralCode: user.treeParent.referralCode
+            } : null,
+            treeChildrenCount: user.treeChildren.length,
+            treeChildren: user.treeChildren.map(child => ({
+                id: child._id,
+                name: child.name,
+                email: child.email,
+                referralCode: child.referralCode,
+                treeLevel: child.treeLevel
+            }))
+        };
 
-        // Calculate commission for each referred user from ALL their orders
-        const formatted = await Promise.all(referredUsers.map(async (h) => {
-            let commission = 0;
-            
-            if (h.firstPurchaseDone) {
-                // Find ALL completed orders by this user
-                const allOrders = await Order.find({ 
-                    user_id: h._id, 
-                    status: "completed",
-                    rewardApplied: true
-                });
-                
-                // Sum up 3% commission from all orders
-                allOrders.forEach(order => {
-                    commission += (order.totalAmount * 3) / 100;
-                });
-            }
-            
-            return {
-                name: h.name,
-                email: h.email,
-                reward: h.firstPurchaseDone ? "Reward Added" : "Pending",
-                commission: commission,
-                joinedDate: h.createdAt,
-                level: 1
-            };
+        // Commission breakdown
+        const commissionBreakdown = {
+            totalEarned: user.wallet,
+            directCommission: user.directCommissionEarned || 0,
+            treeCommission: user.treeCommissionEarned || 0,
+            directPercentage: user.wallet > 0 
+                ? ((user.directCommissionEarned || 0) / user.wallet * 100).toFixed(2)
+                : 0,
+            treePercentage: user.wallet > 0 
+                ? ((user.treeCommissionEarned || 0) / user.wallet * 100).toFixed(2)
+                : 0
+        };
+
+        // Find all people directly referred by this user (using referralCode)
+        const directReferrals = await User.find({ referredBy: user.referralCode })
+            .select("name email firstPurchaseDone createdAt referralCode treeLevel treeParent")
+            .sort({ createdAt: 1 });
+
+        // Format direct referrals with additional info
+        const formattedDirectReferrals = directReferrals.map(ref => ({
+            id: ref._id,
+            name: ref.name,
+            email: ref.email,
+            referralCode: ref.referralCode,
+            firstPurchaseDone: ref.firstPurchaseDone,
+            joinedDate: ref.createdAt,
+            treeLevel: ref.treeLevel,
+            isDirectTreeChild: ref.treeParent && ref.treeParent.toString() === user._id.toString(),
+            placementType: ref.treeParent && ref.treeParent.toString() === user._id.toString() 
+                ? 'direct' 
+                : 'spillover'
         }));
 
-        // Get multi-level commissions (Level 2, 3, 4, etc.)
-        const allCommissions = [];
-        
-        // Function to get all descendants and their commissions from ALL orders
-        async function getDescendantCommissions(parentCode, level, percentage) {
-            const descendants = await User.find({ referredBy: parentCode })
-                .select("name email firstPurchaseDone createdAt referralCode");
-            
-            for (const desc of descendants) {
-                if (desc.firstPurchaseDone) {
-                    // Find ALL completed orders by this user
-                    const allOrders = await Order.find({ 
-                        user_id: desc._id, 
-                        status: "completed",
-                        rewardApplied: true
-                    });
-                    
-                    // Sum up commission from all orders
-                    let totalCommission = 0;
-                    allOrders.forEach(order => {
-                        totalCommission += (order.totalAmount * percentage) / 100;
-                    });
-                    
-                    if (totalCommission > 0) {
-                        allCommissions.push({
-                            name: desc.name,
-                            email: desc.email,
-                            reward: "Reward Added",
-                            commission: totalCommission,
-                            joinedDate: desc.createdAt,
-                            level: level
-                        });
-                    }
-                }
-                
-                // Recursively get next level (each level gets half the percentage)
-                if (level < 10) {
-                    await getDescendantCommissions(desc.referralCode, level + 1, percentage / 2);
-                }
-            }
-        }
+        // Get tree structure (users placed under this user in the tree)
+        const treeStructure = await User.find({ treeParent: user._id })
+            .select("name email firstPurchaseDone createdAt referralCode treeLevel referredBy")
+            .sort({ treePosition: 1 });
 
-        // Get Level 2+ commissions (starting with 1.5% for level 2)
-        for (const ref of referredUsers) {
-            await getDescendantCommissions(ref.referralCode, 2, 1.5);
-        }
-
-        // Combine direct referrals and multi-level commissions
-        const allHistory = [...formatted, ...allCommissions].sort((a, b) => 
-            new Date(b.joinedDate) - new Date(a.joinedDate)
-        );
+        // Format tree structure
+        const formattedTreeStructure = treeStructure.map(child => ({
+            id: child._id,
+            name: child.name,
+            email: child.email,
+            referralCode: child.referralCode,
+            firstPurchaseDone: child.firstPurchaseDone,
+            joinedDate: child.createdAt,
+            treeLevel: child.treeLevel,
+            isDirectReferral: child.referredBy === user.referralCode,
+            placementType: child.referredBy === user.referralCode ? 'direct' : 'spillover'
+        }));
 
         res.json({
+            // Basic referral info
             referralCode: user.referralCode,
             wallet: user.wallet,
             referrals: user.referrals || 0,
-            history: allHistory
+            
+            // Tree placement information
+            treePlacement: treePlacement,
+            
+            // Commission breakdown
+            commissionBreakdown: commissionBreakdown,
+            
+            // Direct referrals (people who used this user's referral code)
+            directReferrals: {
+                count: formattedDirectReferrals.length,
+                users: formattedDirectReferrals
+            },
+            
+            // Tree structure (people placed under this user in the tree)
+            treeStructure: {
+                count: formattedTreeStructure.length,
+                users: formattedTreeStructure
+            }
         });
 
     } catch (err) {
@@ -179,6 +186,143 @@ router.get("/history", authenticateToken, async (req, res) => {
 
     } catch (err) {
         console.error("Referral history error:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// Get commission history with filtering and pagination
+router.get("/commissions", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        // Parse query parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+        
+        // Parse filters
+        const commissionType = req.query.type; // 'direct', 'tree', or undefined for all
+        const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
+        const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+        
+        // Build date filter
+        const dateFilter = {};
+        if (startDate || endDate) {
+            dateFilter.processedAt = {};
+            if (startDate) dateFilter.processedAt.$gte = startDate;
+            if (endDate) dateFilter.processedAt.$lte = endDate;
+        }
+        
+        const commissions = [];
+        let totalDirectCommission = 0;
+        let totalTreeCommission = 0;
+        
+        // Query direct commissions
+        if (!commissionType || commissionType === 'direct') {
+            const directCommissionQuery = {
+                directReferrer: userId,
+                status: 'completed',
+                ...dateFilter
+            };
+            
+            const directCommissions = await CommissionTransaction.find(directCommissionQuery)
+                .populate('purchaser', 'name email')
+                .populate('orderId', 'orderNumber totalAmount')
+                .sort({ processedAt: -1 });
+            
+            directCommissions.forEach(transaction => {
+                if (transaction.directCommissionAmount > 0) {
+                    commissions.push({
+                        _id: transaction._id,
+                        date: transaction.processedAt,
+                        amount: transaction.directCommissionAmount,
+                        commissionType: 'direct',
+                        orderAmount: transaction.orderAmount,
+                        orderId: transaction.orderId?._id,
+                        orderNumber: transaction.orderId?.orderNumber,
+                        purchaser: {
+                            name: transaction.purchaser?.name,
+                            email: transaction.purchaser?.email
+                        },
+                        level: 1,
+                        percentage: 3
+                    });
+                    totalDirectCommission += transaction.directCommissionAmount;
+                }
+            });
+        }
+        
+        // Query tree commissions
+        if (!commissionType || commissionType === 'tree') {
+            const treeCommissionQuery = {
+                'treeCommissions.recipient': userId,
+                status: 'completed',
+                ...dateFilter
+            };
+            
+            const treeCommissions = await CommissionTransaction.find(treeCommissionQuery)
+                .populate('purchaser', 'name email')
+                .populate('orderId', 'orderNumber totalAmount')
+                .sort({ processedAt: -1 });
+            
+            treeCommissions.forEach(transaction => {
+                // Find the specific tree commission for this user
+                const userTreeCommission = transaction.treeCommissions.find(
+                    tc => tc.recipient.toString() === userId
+                );
+                
+                if (userTreeCommission && userTreeCommission.amount > 0) {
+                    commissions.push({
+                        _id: transaction._id,
+                        date: transaction.processedAt,
+                        amount: userTreeCommission.amount,
+                        commissionType: 'tree',
+                        orderAmount: transaction.orderAmount,
+                        orderId: transaction.orderId?._id,
+                        orderNumber: transaction.orderId?.orderNumber,
+                        purchaser: {
+                            name: transaction.purchaser?.name,
+                            email: transaction.purchaser?.email
+                        },
+                        level: userTreeCommission.level,
+                        percentage: userTreeCommission.percentage
+                    });
+                    totalTreeCommission += userTreeCommission.amount;
+                }
+            });
+        }
+        
+        // Sort all commissions by date (most recent first)
+        commissions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        // Calculate totals
+        const totalCommission = totalDirectCommission + totalTreeCommission;
+        const totalCount = commissions.length;
+        
+        // Apply pagination
+        const paginatedCommissions = commissions.slice(skip, skip + limit);
+        
+        res.json({
+            commissions: paginatedCommissions,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalCount: totalCount,
+                limit: limit,
+                hasNextPage: skip + limit < totalCount,
+                hasPrevPage: page > 1
+            },
+            summary: {
+                totalCommission: totalCommission,
+                totalDirectCommission: totalDirectCommission,
+                totalTreeCommission: totalTreeCommission,
+                directCommissionCount: commissions.filter(c => c.commissionType === 'direct').length,
+                treeCommissionCount: commissions.filter(c => c.commissionType === 'tree').length
+            }
+        });
+
+    } catch (err) {
+        console.error("Commission history error:", err);
         res.status(500).json({ error: "Server error" });
     }
 });

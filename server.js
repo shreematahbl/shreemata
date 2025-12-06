@@ -50,6 +50,8 @@ app.use("/api/referral", require("./routes/referral"));
 app.use("/api/referral", require("./routes/referralTree"));
 app.use("/api/admin/withdrawals", require("./routes/adminWithdraw"));
 app.use("/api/admin/fix-rewards", require("./routes/fixDuplicateRewards"));
+app.use("/api/admin", require("./routes/adminTrustFunds"));
+app.use("/api/admin", require("./routes/adminUsers"));
 app.use("/api/bundles", require("./routes/bundles"));
 app.use("/api/notifications", require("./routes/notifications"));
 

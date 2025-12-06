@@ -186,6 +186,7 @@
     </style>
 
     <script src="js/config.js"></script>
+    <script src="js/cartUtils.js"></script>
     <script>
         // API_URL is already defined in config.js
         
@@ -223,7 +224,7 @@
         }
 
         function updateCartCount() {
-            const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+            const cart = typeof getCart === 'function' ? getCart() : JSON.parse(localStorage.getItem("cart_guest") || "[]");
             const count = cart.reduce((sum, item) => sum + item.quantity, 0);
             document.getElementById("cartCount").textContent = count;
         }
@@ -287,7 +288,7 @@
                 const data = await res.json();
                 const bundle = data.bundle;
 
-                let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+                let cart = getCart();
 
                 if (cart.find(item => item.bundleId === bundleId)) {
                     return alert("This bundle is already in your cart!");
@@ -304,7 +305,7 @@
                     coverImage: bundle.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="250" height="300"%3E%3Crect fill="%23ddd" width="250" height="300"/%3E%3Ctext fill="%23999" font-family="Arial" font-size="20" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EBundle%3C/text%3E%3C/svg%3E'
                 });
 
-                localStorage.setItem("cart", JSON.stringify(cart));
+                saveCart(cart);
                 alert(`Bundle "${bundle.name}" added to cart!`);
                 updateCartCount();
             } catch (err) {

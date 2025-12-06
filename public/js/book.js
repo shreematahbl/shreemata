@@ -99,6 +99,16 @@ function displayBookDetails(book) {
     document.getElementById("bookDescription").textContent =
         book.description || "No description available.";
 
+    // Display weight and courier charge
+    const weight = book.weight || 0.5;
+    const courierCharge = calculateCourierCharge(weight);
+    if (document.getElementById("bookWeight")) {
+        document.getElementById("bookWeight").textContent = `${weight.toFixed(2)} kg`;
+    }
+    if (document.getElementById("bookCourierCharge")) {
+        document.getElementById("bookCourierCharge").textContent = `₹${courierCharge.toFixed(2)}`;
+    }
+
     const cover = document.getElementById("bookCover");
     cover.src = book.cover_image || "https://via.placeholder.com/400x600?text=No+Cover";
     cover.onerror = () => (cover.src = "https://via.placeholder.com/400x600?text=No+Cover");
@@ -344,6 +354,17 @@ async function saveAddressFromModal() {
 }
 
 /* -----------------------------------
+   Calculate Courier Charge
+----------------------------------- */
+function calculateCourierCharge(totalWeight) {
+    if (totalWeight <= 0) return 0;
+    
+    // ₹25 per kg (rounded up), max ₹100
+    const charge = Math.ceil(totalWeight) * 25;
+    return Math.min(charge, 100);
+}
+
+/* -----------------------------------
    Proceed to Payment with Address
 ----------------------------------- */
 async function proceedToPayment() {
@@ -367,6 +388,20 @@ async function proceedToPayment() {
     closeAddressModal();
 
     const buyBtn = document.getElementById("buyBtn");
+    
+    // Calculate courier charge based on book weight
+    const bookWeight = currentBook.weight || 0.5; // Default 0.5kg
+    const courierCharge = calculateCourierCharge(bookWeight);
+    const itemsTotal = currentBook.price;
+    const totalAmount = itemsTotal + courierCharge;
+
+    // Show confirmation with courier charge breakdown
+    const confirmMsg = `Order Summary:\n\nBook: ${currentBook.title}\nPrice: ₹${itemsTotal.toFixed(2)}\nWeight: ${bookWeight.toFixed(2)} kg\nCourier Charge: ₹${courierCharge.toFixed(2)}\n\nTotal Amount: ₹${totalAmount.toFixed(2)}\n\nProceed to payment?`;
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
     const items = [{
         id: currentBook._id,
         title: currentBook.title,
@@ -374,7 +409,8 @@ async function proceedToPayment() {
         price: currentBook.price,
         quantity: 1,
         coverImage: currentBook.cover_image,
-        type: 'book'
+        type: 'book',
+        weight: bookWeight
     }];
 
     try {
@@ -383,7 +419,7 @@ async function proceedToPayment() {
             buyBtn.textContent = "Processing...";
         }
 
-        // 1️⃣ Create backend Razorpay order with address
+        // 1️⃣ Create backend Razorpay order with address and courier charge
         const orderRes = await fetch(`${API}/payments/create-order`, {
             method: "POST",
             headers: {
@@ -391,9 +427,11 @@ async function proceedToPayment() {
                 "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
-                amount: currentBook.price,
+                amount: totalAmount,
                 items: items,
-                deliveryAddress: userAddress
+                deliveryAddress: userAddress,
+                courierCharge: courierCharge,
+                totalWeight: bookWeight
             })
         });
 
@@ -428,8 +466,10 @@ async function proceedToPayment() {
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
                             items: items,
-                            totalAmount: currentBook.price,
-                            deliveryAddress: userAddress
+                            totalAmount: totalAmount,
+                            deliveryAddress: userAddress,
+                            courierCharge: courierCharge,
+                            totalWeight: bookWeight
                         })
                     });
 
@@ -493,7 +533,7 @@ async function proceedToPayment() {
 function addToCart() {
     const bookId = new URLSearchParams(window.location.search).get("id");
 
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = getCart();
 
     if (cart.some((item) => item.id === bookId)) {
         return alert("Already in cart!");
@@ -503,12 +543,13 @@ function addToCart() {
         id: bookId,
         title: document.getElementById("bookTitle").textContent,
         author: document.getElementById("bookAuthor").textContent,
-        price: parseFloat(document.getElementById("bookPrice").textContent.replace("$", "")),
+        price: parseFloat(document.getElementById("bookPrice").textContent.replace("₹", "")),
         coverImage: document.getElementById("bookCover").src,
-        quantity: 1
+        quantity: 1,
+        weight: currentBook ? (currentBook.weight || 0.5) : 0.5
     });
 
-    localStorage.setItem("cart", JSON.stringify(cart));
+    saveCart(cart);
     alert("Book added to cart!");
 }
 

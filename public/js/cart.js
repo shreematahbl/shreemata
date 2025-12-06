@@ -9,8 +9,13 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ------------------------------
     Load Cart Items
 ------------------------------ */
-function loadCart() {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+async function loadCart() {
+    // Migrate old cart format if exists
+    if (typeof migrateOldCart === 'function') {
+        migrateOldCart();
+    }
+    
+    let cart = getCart();
 
     const container = document.getElementById("cartContainer");
     const summary = document.getElementById("cartSummary");
@@ -29,10 +34,16 @@ function loadCart() {
     empty.style.display = "none";
     summary.style.display = "block";
 
+    // Fetch book weights from API
+    await fetchBookWeights(cart);
+
     let total = 0;
+    let totalWeight = 0;
 
     cart.forEach(item => {
         total += item.price * item.quantity;
+        const itemWeight = (item.weight || 0.5) * item.quantity;
+        totalWeight += itemWeight;
 
         const row = document.createElement("div");
         row.className = "cart-item";
@@ -47,9 +58,10 @@ function loadCart() {
             <img src="${imageUrl}" class="cart-img">
 
             <div class="cart-info">
-                <h3>${item.title}</h3>
+                <h3>${item.title}${item.isBundle ? ' <span style="background: #ff9800; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 5px;">BUNDLE</span>' : ''}</h3>
                 <p>by ${item.author}</p>
-                <p class="cart-price">$${item.price.toFixed(2)}</p>
+                <p class="cart-price">₹${item.price.toFixed(2)}</p>
+                <p style="font-size: 13px; color: #ff9800; margin: 5px 0;">📦 ${(item.weight || 0.5).toFixed(2)} kg × ${item.quantity} = ${(itemWeight).toFixed(2)} kg</p>
                 
                 <div class="cart-qty">
                     <button class="qty-btn" data-id="${item.id || item.bundleId}" data-action="minus">-</button>
@@ -66,7 +78,93 @@ function loadCart() {
         container.appendChild(row);
     });
 
-    document.getElementById("cartTotal").textContent = total.toFixed(2);
+    // Calculate courier charge
+    const courierCharge = calculateCourierCharge(totalWeight);
+    const grandTotal = total + courierCharge;
+
+    // Update cart summary with breakdown
+    const cartTotalEl = document.getElementById("cartTotal");
+    cartTotalEl.innerHTML = `
+        <div style="text-align: right; margin-bottom: 10px;">
+            <div style="margin: 5px 0;">Subtotal: ₹${total.toFixed(2)}</div>
+            <div style="margin: 5px 0; color: #666;">Total Weight: ${totalWeight.toFixed(2)} kg</div>
+            <div style="margin: 5px 0; color: #666;">Courier Charge: ₹${courierCharge.toFixed(2)}</div>
+            <div style="border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; font-size: 1.2em; font-weight: bold;">
+                Grand Total: ₹${grandTotal.toFixed(2)}
+            </div>
+        </div>
+    `;
+
+    // Store courier info for checkout
+    localStorage.setItem("courierInfo", JSON.stringify({
+        totalWeight,
+        courierCharge,
+        grandTotal
+    }));
+}
+
+/* ------------------------------
+    Fetch Book Weights from API
+------------------------------ */
+async function fetchBookWeights(cart) {
+    const API = window.API_URL || '';
+    
+    for (let item of cart) {
+        // Fetch weight for individual books
+        if (!item.weight && item.id && !item.isBundle) {
+            try {
+                const res = await fetch(`${API}/books/${item.id}`);
+                const data = await res.json();
+                if (data.book && data.book.weight) {
+                    item.weight = data.book.weight;
+                }
+            } catch (err) {
+                console.error("Error fetching book weight:", err);
+                item.weight = 0.5; // Default fallback
+            }
+        }
+        
+        // Fetch weight for bundles
+        if (!item.weight && item.bundleId && item.isBundle) {
+            try {
+                const res = await fetch(`${API}/bundles/${item.bundleId}`);
+                const data = await res.json();
+                if (data.bundle && data.bundle.weight) {
+                    item.weight = data.bundle.weight;
+                } else if (data.bundle && data.bundle.books) {
+                    // Calculate from books if weight not stored
+                    item.weight = data.bundle.books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
+                }
+            } catch (err) {
+                console.error("Error fetching bundle weight:", err);
+                // Fallback: estimate based on number of books if available
+                if (item.books && item.books.length) {
+                    item.weight = item.books.length * 0.5;
+                } else {
+                    item.weight = 2; // Default bundle weight
+                }
+            }
+        }
+        
+        // Final fallback if still no weight
+        if (!item.weight) {
+            item.weight = item.isBundle ? 2 : 0.5;
+        }
+    }
+    
+    // Update cart in localStorage with weights
+    saveCart(cart);
+}
+
+/* ------------------------------
+    Calculate Courier Charge
+------------------------------ */
+function calculateCourierCharge(totalWeight) {
+    if (totalWeight <= 0) return 0;
+    
+    // ₹25 per kg (rounded up), max ₹100
+    const charge = Math.ceil(totalWeight) * 25;
+    return Math.min(charge, 100);
 }
 
 /* ------------------------------
@@ -98,8 +196,8 @@ function setupCartActions() {
 /* ------------------------------
     Update Quantity
 ------------------------------ */
-function updateQuantity(itemId, action) {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+async function updateQuantity(itemId, action) {
+    let cart = getCart();
 
     const item = cart.find(i => i.id === itemId || i.bundleId === itemId);
     if (!item) return;
@@ -107,20 +205,20 @@ function updateQuantity(itemId, action) {
     if (action === "plus") item.quantity++;
     if (action === "minus" && item.quantity > 1) item.quantity--;
 
-    localStorage.setItem("cart", JSON.stringify(cart));
-    loadCart();
+    saveCart(cart);
+    await loadCart();
 }
 
 /* ------------------------------
     Remove Item
 ------------------------------ */
-function removeFromCart(itemId) {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+async function removeFromCart(itemId) {
+    let cart = getCart();
 
     cart = cart.filter(item => item.id !== itemId && item.bundleId !== itemId);
 
-    localStorage.setItem("cart", JSON.stringify(cart));
-    loadCart();
+    saveCart(cart);
+    await loadCart();
 }
 
 /* ------------------------------
@@ -144,16 +242,16 @@ async function checkout() {
         return;
     }
 
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = getCart();
     if (cart.length === 0) {
         alert("Your cart is empty.");
         return;
     }
 
-    // Calculate cart total
+    // Calculate cart total (without courier charge for offer calculation)
     const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    // Check for applicable offers
+    // Check for applicable offers (on items only, not courier)
     await checkApplicableOffers(cartTotal);
 }
 
@@ -204,11 +302,33 @@ function showOfferModal(offerData) {
     console.log("Offer Data:", offerData);
     
     try {
+        // Get courier info
+        const courierInfo = JSON.parse(localStorage.getItem("courierInfo") || "{}");
+        const courierCharge = courierInfo.courierCharge || 0;
+        
+        // Calculate final amount with courier
+        const finalWithCourier = offerData.discountedAmount + courierCharge;
+        
         document.getElementById("offerTitle").textContent = offerData.applicableOffer.title;
         document.getElementById("offerMessage").textContent = offerData.applicableOffer.message;
         document.getElementById("offerOriginalAmount").textContent = offerData.originalAmount.toFixed(2);
         document.getElementById("offerDiscount").textContent = offerData.savings.toFixed(2);
-        document.getElementById("offerFinalAmount").textContent = offerData.discountedAmount.toFixed(2);
+        
+        // Update the final amount display to include courier charge breakdown
+        const finalAmountEl = document.getElementById("offerFinalAmount");
+        if (courierCharge > 0) {
+            finalAmountEl.innerHTML = `
+                ${offerData.discountedAmount.toFixed(2)}
+                <div style="font-size: 14px; font-weight: normal; color: #666; margin-top: 5px;">
+                    + ₹${courierCharge.toFixed(2)} courier charge
+                </div>
+                <div style="font-size: 18px; font-weight: 700; color: #28a745; margin-top: 5px;">
+                    = ₹${finalWithCourier.toFixed(2)}
+                </div>
+            `;
+        } else {
+            finalAmountEl.textContent = offerData.discountedAmount.toFixed(2);
+        }
         
         document.getElementById("offerModal").style.display = "block";
         console.log("✅ Offer modal displayed");
@@ -363,7 +483,7 @@ async function proceedToPayment() {
         userAddress = null; // Set to null if not complete
     }
 
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = getCart();
     if (cart.length === 0) {
         alert("Your cart is empty.");
         return;
@@ -372,9 +492,17 @@ async function proceedToPayment() {
     // Close modal
     closeAddressModal();
 
-    // calculate total (in rupees)
-    let total = 0;
-    cart.forEach(item => total += item.price * item.quantity);
+    // Get courier info
+    const courierInfo = JSON.parse(localStorage.getItem("courierInfo") || "{}");
+    const courierCharge = courierInfo.courierCharge || 0;
+    const totalWeight = courierInfo.totalWeight || 0;
+
+    // calculate items total (in rupees)
+    let itemsTotal = 0;
+    cart.forEach(item => itemsTotal += item.price * item.quantity);
+    
+    // Add courier charge to total
+    let total = itemsTotal + courierCharge;
     // Round to 2 decimals to avoid floating issues
     total = Math.round((total + Number.EPSILON) * 100) / 100;
 
@@ -424,7 +552,8 @@ async function proceedToPayment() {
         let appliedOffer = null;
         
         if (currentOffer && currentOffer.applicableOffer) {
-            finalAmount = currentOffer.discountedAmount;
+            // Offer applies to items only, then add courier charge
+            finalAmount = currentOffer.discountedAmount + courierCharge;
             appliedOffer = {
                 offerId: currentOffer.applicableOffer._id,
                 offerTitle: currentOffer.applicableOffer.title,
@@ -435,9 +564,10 @@ async function proceedToPayment() {
                 savings: currentOffer.savings
             };
             console.log("Applying offer:", appliedOffer);
+            console.log("Final amount with courier:", finalAmount);
         }
         
-        // 1) Create order on backend with address and offer
+        // 1) Create order on backend with address, offer, and courier info
         const createRes = await fetch(`${API}/payments/create-order`, {
             method: "POST",
             headers: {
@@ -448,7 +578,9 @@ async function proceedToPayment() {
                 amount: finalAmount, 
                 items: orderItems,
                 deliveryAddress: userAddress,
-                appliedOffer: appliedOffer
+                appliedOffer: appliedOffer,
+                courierCharge: courierCharge,
+                totalWeight: totalWeight
             })
         });
 
@@ -516,7 +648,7 @@ async function proceedToPayment() {
                     // Payment verified and order updated
                     alert("Payment successful! Thank you for your purchase. Check your email for order confirmation.");
                     // Clear cart
-                    localStorage.removeItem("cart");
+                    clearCart();
                     // Redirect to orders page
                     window.location.href = "/orders.html";
 

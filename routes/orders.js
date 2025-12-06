@@ -78,16 +78,37 @@ router.put("/admin/update-status/:id", authenticateToken, isAdmin, async (req, r
             return res.status(400).json({ error: "Invalid status" });
         }
 
-        const updatedOrder = await Order.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true }
-        );
-
-        if (!updatedOrder)
+        const order = await Order.findById(req.params.id);
+        if (!order) {
             return res.status(404).json({ error: "Order not found" });
+        }
 
-        res.json({ message: "Order status updated", order: updatedOrder });
+        const previousStatus = order.status;
+        order.status = status;
+        await order.save();
+
+        // If status changed to "completed" and commissions haven't been distributed yet
+        if (status === "completed" && previousStatus !== "completed" && !order.rewardApplied) {
+            try {
+                console.log("💰 Admin status update: Distributing commissions for order:", order._id);
+                const { distributeCommissions } = require("../services/commissionDistribution");
+                const commissionTransaction = await distributeCommissions(
+                    order._id,
+                    order.user_id,
+                    order.totalAmount
+                );
+                console.log("✅ Commission distribution completed:", commissionTransaction._id);
+                
+                // Mark reward as applied
+                order.rewardApplied = true;
+                await order.save();
+            } catch (commissionError) {
+                console.error("❌ Commission distribution error:", commissionError);
+                // Log error but don't fail the status update
+            }
+        }
+
+        res.json({ message: "Order status updated", order });
 
     } catch (err) {
         console.error("Update status error:", err);

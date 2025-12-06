@@ -122,6 +122,17 @@
                         <p class="savings">You Save: ₹<span id="savings"></span></p>
                     </div>
 
+                    <div style="background: #fff3e0; padding: 12px 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ff9800;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #e65100; font-weight: 600;">📦 Total Weight:</span>
+                            <span id="bundleWeight" style="color: #e65100; font-weight: 600;">0 kg</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <span style="color: #e65100; font-size: 13px;">Courier Charge:</span>
+                            <span id="bundleCourierCharge" style="color: #e65100; font-size: 13px;">₹0</span>
+                        </div>
+                    </div>
+
                     <p style="color: #666;">
                         <strong id="bookCount"></strong> books included in this bundle
                     </p>
@@ -147,9 +158,17 @@
     </div>
 
     <script src="js/config.js"></script>
+    <script src="js/cartUtils.js"></script>
     <script>
         const API = window.API_URL;
         let currentBundle = null;
+
+        // Calculate courier charge
+        function calculateCourierCharge(totalWeight) {
+            if (totalWeight <= 0) return 0;
+            const charge = Math.ceil(totalWeight) * 25;
+            return Math.min(charge, 100);
+        }
 
         document.addEventListener("DOMContentLoaded", () => {
             loadBundleDetails();
@@ -192,6 +211,12 @@
             document.getElementById("savings").textContent = (bundle.originalPrice - bundle.bundlePrice).toFixed(2);
             document.getElementById("bookCount").textContent = bundle.books.length;
 
+            // Calculate and display weight and courier charge
+            const weight = bundle.weight || bundle.books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
+            const courierCharge = calculateCourierCharge(weight);
+            document.getElementById("bundleWeight").textContent = `${weight.toFixed(2)} kg`;
+            document.getElementById("bundleCourierCharge").textContent = `₹${courierCharge.toFixed(2)}`;
+
             // Display books
             const grid = document.getElementById("booksGrid");
             grid.innerHTML = bundle.books.map(book => `
@@ -207,12 +232,15 @@
         function addToCart() {
             if (!currentBundle) return;
 
-            let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+            let cart = getCart();
 
             // Check if bundle already in cart
             if (cart.find(item => item.bundleId === currentBundle._id)) {
                 return alert("This bundle is already in your cart!");
             }
+
+            // Calculate bundle weight
+            const weight = currentBundle.weight || currentBundle.books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
 
             // Add bundle to cart
             cart.push({
@@ -223,10 +251,11 @@
                 originalPrice: currentBundle.originalPrice,
                 books: currentBundle.books,
                 quantity: 1,
+                weight: weight,
                 coverImage: currentBundle.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="250" height="300"%3E%3Crect fill="%23ddd" width="250" height="300"/%3E%3Ctext fill="%23999" font-family="Arial" font-size="20" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EBundle%3C/text%3E%3C/svg%3E'
             });
 
-            localStorage.setItem("cart", JSON.stringify(cart));
+            saveCart(cart);
             alert(`Bundle "${currentBundle.name}" added to cart!`);
             window.location.href = "/cart.html";
         }

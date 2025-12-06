@@ -444,6 +444,18 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Total Weight</label>
+                    <input type="text" id="totalWeight" readonly placeholder="0.00 kg">
+                    <small style="color: #ff9800;">Calculated from selected books</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Courier Charge</label>
+                    <input type="text" id="courierCharge" readonly placeholder="₹0.00">
+                    <small style="color: #ff9800;">₹25 per kg (rounded up), max ₹100</small>
+                </div>
+
+                <div class="form-group">
                     <label>Bundle Price *</label>
                     <input type="number" id="bundlePrice" required step="0.01" placeholder="Discounted price">
                 </div>
@@ -471,6 +483,13 @@
         // API_URL is already defined in config.js
         let allBooks = [];
         let editingBundleId = null;
+
+        // Calculate courier charge
+        function calculateCourierCharge(totalWeight) {
+            if (totalWeight <= 0) return 0;
+            const charge = Math.ceil(totalWeight) * 25;
+            return Math.min(charge, 100);
+        }
 
         document.addEventListener("DOMContentLoaded", () => {
             console.log("Admin Bundles - Using API:", API_URL);
@@ -540,6 +559,22 @@
                 const data = await res.json();
                 console.log("Loaded bundles:", data.bundles?.length || 0);
                 
+                // Debug: Log bundle details
+                if (data.bundles && data.bundles.length > 0) {
+                    console.log("=== Bundle Weight Debug ===");
+                    data.bundles.forEach((bundle, index) => {
+                        console.log(`Bundle ${index + 1}: ${bundle.name}`);
+                        console.log("  Stored weight:", bundle.weight);
+                        console.log("  Number of books:", bundle.books?.length || 0);
+                        if (bundle.books) {
+                            bundle.books.forEach((book, bookIndex) => {
+                                console.log(`    Book ${bookIndex + 1}: ${book.title} - Weight: ${book.weight || 'NOT SET'}`);
+                            });
+                        }
+                    });
+                    console.log("========================");
+                }
+                
                 // Update debug info
                 document.getElementById("bundlesCount").textContent = data.bundles?.length || 0;
                 
@@ -575,6 +610,27 @@
                                 <span style="text-decoration: line-through; color: #999;">₹${bundle.originalPrice}</span>
                                 <span style="font-size: 24px; font-weight: bold; margin: 0 10px;">₹${bundle.bundlePrice}</span>
                                 <span class="discount-badge">${bundle.discount}% OFF</span>
+                            </div>
+
+                            <div style="background: #fff3e0; padding: 10px 12px; border-radius: 6px; margin: 10px 0; border-left: 3px solid #ff9800; display: inline-block;">
+                                <span style="color: #e65100; font-size: 13px;">📦 Weight: <strong>${(() => {
+                                    let weight = bundle.weight;
+                                    if (!weight && bundle.books && bundle.books.length) {
+                                        console.log(`Calculating weight for bundle: ${bundle.name}`);
+                                        console.log("Books:", bundle.books.map(b => `${b.title}: ${b.weight || 0.5}kg`));
+                                        weight = bundle.books.reduce((sum, book) => {
+                                            const bookWeight = book.weight || 0.5;
+                                            console.log(`  Adding ${bookWeight}kg, sum now: ${sum + bookWeight}kg`);
+                                            return sum + bookWeight;
+                                        }, 0);
+                                        console.log(`Total calculated weight: ${weight}kg`);
+                                    }
+                                    return (weight || 0).toFixed(2);
+                                })()} kg</strong></span>
+                                <span style="color: #e65100; font-size: 13px; margin-left: 15px;">Courier: <strong>₹${(() => {
+                                    const weight = bundle.weight || (bundle.books && bundle.books.length ? bundle.books.reduce((sum, book) => sum + (book.weight || 0.5), 0) : 0);
+                                    return calculateCourierCharge(weight).toFixed(2);
+                                })()}</strong></span>
                             </div>
 
                             <p style="color: #666; font-size: 14px;">
@@ -645,6 +701,7 @@
                         <div style="font-weight: bold; font-size: 12px; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${book.title}">${book.title}</div>
                         <div style="font-size: 10px; color: #666; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${book.author || 'Unknown Author'}</div>
                         <div style="font-weight: bold; color: #667eea; font-size: 14px;">₹${book.price}</div>
+                        <div style="font-size: 10px; color: #ff9800; margin-top: 2px;">📦 ${book.weight || 0.5} kg</div>
                     </div>
                 </label>
             `).join('');
@@ -685,16 +742,25 @@
         function updatePrices() {
             const checkboxes = document.querySelectorAll('#bookSelector input[type="checkbox"]:checked');
             let total = 0;
+            let totalWeight = 0;
             
             checkboxes.forEach(cb => {
                 const book = allBooks.find(b => b._id === cb.value);
-                if (book) total += book.price;
+                if (book) {
+                    total += book.price;
+                    totalWeight += (book.weight || 0.5);
+                }
             });
 
             // Update selected count
             document.getElementById("selectedCount").textContent = `${checkboxes.length} book${checkboxes.length !== 1 ? 's' : ''} selected`;
 
             document.getElementById("originalPrice").value = total.toFixed(2);
+            
+            // Update weight and courier charge
+            document.getElementById("totalWeight").value = totalWeight.toFixed(2) + " kg";
+            const courierCharge = calculateCourierCharge(totalWeight);
+            document.getElementById("courierCharge").value = "₹" + courierCharge.toFixed(2);
 
             const bundlePrice = parseFloat(document.getElementById("bundlePrice").value) || 0;
             if (bundlePrice > 0 && total > 0) {

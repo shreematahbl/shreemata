@@ -6,6 +6,7 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const { authenticateToken } = require("../middleware/auth");
 const { sendOrderConfirmationEmail, sendAdminNotification } = require("../utils/emailService");
+const { distributeCommissions } = require("../services/commissionDistribution");
 
 const router = express.Router();
 
@@ -125,9 +126,16 @@ async function applyReferralRewardForOrder(order) {
 // =====================================================
 router.post("/create-order", authenticateToken, async (req, res) => {
   try {
-    const { amount, items, deliveryAddress, appliedOffer } = req.body;
+    const { amount, items, deliveryAddress, appliedOffer, courierCharge, totalWeight } = req.body;
 
-    console.log("Create order request:", { amount, itemsCount: items?.length, hasAddress: !!deliveryAddress, hasOffer: !!appliedOffer });
+    console.log("Create order request:", { 
+      amount, 
+      itemsCount: items?.length, 
+      hasAddress: !!deliveryAddress, 
+      hasOffer: !!appliedOffer,
+      courierCharge,
+      totalWeight
+    });
     console.log("Items type:", typeof items, "Is array:", Array.isArray(items));
     
     // Ensure items is an array
@@ -186,6 +194,8 @@ router.post("/create-order", authenticateToken, async (req, res) => {
       user_id: req.user.id,
       items: orderItems,
       totalAmount: amount,
+      courierCharge: courierCharge || 0,
+      totalWeight: totalWeight || 0,
       appliedOffer: offerData,
       deliveryAddress: addressData,
       status: "pending",
@@ -261,7 +271,23 @@ router.post("/verify", authenticateToken, async (req, res) => {
 
     console.log("✅ Verify: Order marked as processed, applying rewards...");
 
-    // APPLY REFERRAL SYSTEM (order already marked as rewardApplied)
+    // APPLY NEW COMMISSION DISTRIBUTION SYSTEM
+    try {
+      console.log("💰 Distributing commissions for order:", order._id);
+      const commissionTransaction = await distributeCommissions(
+        order._id,
+        order.user_id,
+        order.totalAmount
+      );
+      console.log("✅ Commission distribution completed:", commissionTransaction._id);
+    } catch (commissionError) {
+      console.error("❌ Commission distribution error:", commissionError);
+      // Log error but don't fail the payment verification
+      // Implement retry logic here if needed
+    }
+
+    // APPLY OLD REFERRAL SYSTEM (order already marked as rewardApplied)
+    // TODO: Remove this once new system is fully tested
     const result = await applyReferralRewardForOrder(order);
     console.log("Referral Result:", result);
 
@@ -378,6 +404,23 @@ router.post("/webhook", async (req, res) => {
 
       if (order) {
         console.log("✅ Webhook: Order marked as processed, applying rewards...");
+        
+        // APPLY NEW COMMISSION DISTRIBUTION SYSTEM
+        try {
+          console.log("💰 Webhook: Distributing commissions for order:", order._id);
+          const commissionTransaction = await distributeCommissions(
+            order._id,
+            order.user_id,
+            order.totalAmount
+          );
+          console.log("✅ Webhook: Commission distribution completed:", commissionTransaction._id);
+        } catch (commissionError) {
+          console.error("❌ Webhook: Commission distribution error:", commissionError);
+          // Implement retry logic here if needed
+        }
+        
+        // APPLY OLD REFERRAL SYSTEM
+        // TODO: Remove this once new system is fully tested
         await applyReferralRewardForOrder(order);
         
         // Send email notification from webhook as backup

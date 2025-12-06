@@ -439,6 +439,8 @@
                 <a href="/admin-orders.html">Orders</a>
                 <a href="/admin-withdrawals.html">Withdrawals</a>
                 <a href="/admin-notifications.html">Notifications</a>
+                <a href="/admin-income.html">Income</a>
+                <a href="/admin-users.html">Users</a>
                 <a href="/" id="logoutBtn">Logout</a>
             </div>
         </div>
@@ -476,8 +478,13 @@
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="price">Price ($) *</label>
+                                    <label for="price">Price (₹) *</label>
                                     <input type="number" id="price" name="price" step="0.01" min="0" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="weight">Weight (kg) *</label>
+                                    <input type="number" id="weight" name="weight" step="0.1" min="0.1" value="0.5" required placeholder="0.5">
+                                    <small>Used for courier charge calculation</small>
                                 </div>
                             </div>
 

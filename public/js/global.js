@@ -1,6 +1,6 @@
 // Load and update cart count
 function updateCartCount() {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    let cart = typeof getCart === 'function' ? getCart() : JSON.parse(localStorage.getItem("cart") || "[]");
     const countEl = document.getElementById("cartCount");
 
     if (countEl) {

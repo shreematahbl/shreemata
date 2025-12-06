@@ -17,6 +17,10 @@ const orderSchema = new mongoose.Schema({
 
     totalAmount: Number,
 
+    // Courier Charges
+    courierCharge: { type: Number, default: 0 },
+    totalWeight: { type: Number, default: 0 },
+
     // Applied Offer Details
     appliedOffer: {
         offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Notification" },

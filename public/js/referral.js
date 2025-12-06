@@ -35,11 +35,14 @@ function checkAuth() {
 }
 
 function updateCartCount() {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = typeof getCart === 'function' ? getCart() : JSON.parse(localStorage.getItem("cart") || "[]");
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
     const cartCountEl = document.getElementById("cartCount");
     if (cartCountEl) cartCountEl.textContent = count;
 }
+
+let allReferrals = [];
+let currentFilter = 'all';
 
 async function loadReferralDetails() {
     const token = localStorage.getItem("token");
@@ -70,10 +73,126 @@ async function loadReferralDetails() {
         const link = `${window.location.origin}/signup.html?ref=${data.referralCode}`;
         document.getElementById("refLink").value = link;
 
+        // Update tree level and children count
+        document.getElementById("treeLevel").textContent = data.treePlacement?.treeLevel || 0;
+        document.getElementById("treeChildrenCount").textContent = data.treePlacement?.treeChildrenCount || 0;
+
+        // Update commission breakdown
+        const commissionBreakdown = data.commissionBreakdown || {};
+        document.getElementById("directCommission").textContent = parseFloat(commissionBreakdown.directCommission || 0).toFixed(2);
+        document.getElementById("treeCommission").textContent = parseFloat(commissionBreakdown.treeCommission || 0).toFixed(2);
+        document.getElementById("directPercentage").textContent = commissionBreakdown.directPercentage || 0;
+        document.getElementById("treePercentage").textContent = commissionBreakdown.treePercentage || 0;
+
+        // Update tree position info
+        document.getElementById("userTreeLevel").textContent = data.treePlacement?.treeLevel || 0;
+        document.getElementById("directTreeChildren").textContent = data.treePlacement?.treeChildrenCount || 0;
+        
+        if (data.treePlacement?.treeParent) {
+            document.getElementById("treeParentInfo").textContent = 
+                `${data.treePlacement.treeParent.name} (${data.treePlacement.treeParent.referralCode})`;
+        } else {
+            document.getElementById("treeParentInfo").textContent = "None (Root Level)";
+        }
+
+        // Load referrals
+        loadReferrals(data);
+
     } catch (err) {
         console.error("Error loading referral details:", err);
         alert("Error loading referral details. Please try again.");
     }
+}
+
+function loadReferrals(data) {
+    const loading = document.getElementById("referralsLoading");
+    const content = document.getElementById("referralsContent");
+    const noReferrals = document.getElementById("noReferrals");
+    const tableBody = document.getElementById("referralsTableBody");
+
+    loading.style.display = "none";
+    content.style.display = "block";
+
+    // Get direct referrals
+    allReferrals = data.directReferrals?.users || [];
+
+    if (allReferrals.length === 0) {
+        noReferrals.style.display = "block";
+        tableBody.parentElement.parentElement.style.display = "none";
+        document.getElementById("countAll").textContent = "0";
+        document.getElementById("countDirect").textContent = "0";
+        document.getElementById("countSpillover").textContent = "0";
+        return;
+    }
+
+    // Count placement types
+    const directCount = allReferrals.filter(r => r.placementType === 'direct').length;
+    const spilloverCount = allReferrals.filter(r => r.placementType === 'spillover').length;
+
+    document.getElementById("countAll").textContent = allReferrals.length;
+    document.getElementById("countDirect").textContent = directCount;
+    document.getElementById("countSpillover").textContent = spilloverCount;
+
+    // Display referrals
+    displayReferrals();
+}
+
+function displayReferrals() {
+    const tableBody = document.getElementById("referralsTableBody");
+    tableBody.innerHTML = "";
+
+    // Filter referrals based on current filter
+    let filteredReferrals = allReferrals;
+    if (currentFilter !== 'all') {
+        filteredReferrals = allReferrals.filter(r => r.placementType === currentFilter);
+    }
+
+    filteredReferrals.forEach(ref => {
+        const row = document.createElement("tr");
+        row.style.borderBottom = "1px solid #f0f0f0";
+        
+        const placementColor = ref.placementType === 'direct' ? '#667eea' : '#f5576c';
+        const placementText = ref.placementType === 'direct' ? 'Direct' : 'Spillover';
+        const placementIcon = ref.placementType === 'direct' ? '⭐' : '🔄';
+        
+        const joinedDate = new Date(ref.joinedDate).toLocaleDateString();
+
+        row.innerHTML = `
+            <td style="padding: 12px; font-size: 14px; font-weight: 500;">${ref.name}</td>
+            <td style="padding: 12px; font-size: 14px; color: #666;">${ref.email}</td>
+            <td style="padding: 12px; text-align: center;">
+                <span style="background: #667eea; color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                    L${ref.treeLevel}
+                </span>
+            </td>
+            <td style="padding: 12px; text-align: center;">
+                <span style="background: ${placementColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                    ${placementIcon} ${placementText}
+                </span>
+            </td>
+            <td style="padding: 12px; text-align: center; font-size: 13px; color: #666;">${joinedDate}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+function filterReferrals(type) {
+    currentFilter = type;
+    
+    // Update button states
+    document.getElementById("filterAll").classList.remove("active");
+    document.getElementById("filterDirect").classList.remove("active");
+    document.getElementById("filterSpillover").classList.remove("active");
+    
+    if (type === 'all') {
+        document.getElementById("filterAll").classList.add("active");
+    } else if (type === 'direct') {
+        document.getElementById("filterDirect").classList.add("active");
+    } else if (type === 'spillover') {
+        document.getElementById("filterSpillover").classList.add("active");
+    }
+    
+    displayReferrals();
 }
 
 function copyLink() {
@@ -164,87 +283,3 @@ async function requestWithdraw(event) {
     }
 }
 
-
-// Load referral history - using existing details endpoint
-async function loadReferralHistory() {
-    const token = localStorage.getItem("token");
-    const loading = document.getElementById("historyLoading");
-    const content = document.getElementById("historyContent");
-    const noHistory = document.getElementById("noHistory");
-    const tableBody = document.getElementById("historyTableBody");
-
-    try {
-        const res = await fetch(`${window.API_URL}/referral/details`, {
-            headers: { "Authorization": "Bearer " + token }
-        });
-
-        if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        loading.style.display = "none";
-        content.style.display = "block";
-
-        if (!data.history || data.history.length === 0) {
-            noHistory.style.display = "block";
-            tableBody.parentElement.parentElement.style.display = "none";
-            document.getElementById("totalReferrals").textContent = "0";
-            document.getElementById("totalCommission").textContent = "₹0";
-            return;
-        }
-
-        // Calculate totals
-        const totalReferrals = data.history.length;
-        // Commission calculation would need actual purchase data
-        const totalCommission = 0; // Placeholder
-
-        document.getElementById("totalReferrals").textContent = totalReferrals;
-        document.getElementById("totalCommission").textContent = `₹${data.wallet.toFixed(2)}`;
-
-        // Calculate total commission from individual referrals
-        const calculatedCommission = data.history.reduce((sum, ref) => sum + (ref.commission || 0), 0);
-        document.getElementById("totalCommission").textContent = `₹${calculatedCommission.toFixed(2)}`;
-
-        // Populate table
-        tableBody.innerHTML = "";
-        data.history.forEach(ref => {
-            const row = document.createElement("tr");
-            row.style.borderBottom = "1px solid #f0f0f0";
-            
-            const status = ref.reward === "Reward Added" ? "Active" : "Pending";
-            const statusColor = ref.reward === "Reward Added" ? "#28a745" : "#ffc107";
-            const commission = ref.commission || 0;
-            const commissionText = commission > 0 ? `₹${commission.toFixed(2)}` : "-";
-            const level = ref.level || 1;
-            const levelColor = level === 1 ? "#667eea" : level === 2 ? "#28a745" : "#ffc107";
-
-            row.innerHTML = `
-                <td style="padding: 12px; font-size: 14px;">${ref.name || "User"}</td>
-                <td style="padding: 12px; font-size: 14px; color: #666;">${ref.email}</td>
-                <td style="padding: 12px; text-align: center;">
-                    <span style="background: ${levelColor}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">
-                        L${level}
-                    </span>
-                </td>
-                <td style="padding: 12px; font-size: 14px; text-align: right; font-weight: 600; color: #28a745;">${commissionText}</td>
-                <td style="padding: 12px; text-align: center;">
-                    <span style="background: ${statusColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
-                        ${status}
-                    </span>
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
-
-    } catch (err) {
-        console.error("Error loading referral history:", err);
-        loading.innerHTML = "Error loading history";
-    }
-}
-
-// Call it on page load
-document.addEventListener("DOMContentLoaded", () => {
-    loadReferralHistory();
-});

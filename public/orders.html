@@ -276,6 +276,7 @@
     </style>
 
     <script src="js/config.js"></script>
+    <script src="js/cartUtils.js"></script>
     <script>
         // API_URL is already defined in config.js
 
@@ -310,7 +311,7 @@
         }
 
         function updateCartCount() {
-            const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+            const cart = typeof getCart === 'function' ? getCart() : JSON.parse(localStorage.getItem("cart_guest") || "[]");
             const count = cart.reduce((sum, item) => sum + item.quantity, 0);
             document.getElementById("cartCount").textContent = count;
         }
@@ -421,6 +422,20 @@
                             <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; color: #155724; padding-top: 8px; border-top: 1px solid #28a745;">
                                 <span>You Paid:</span>
                                 <span>₹${order.appliedOffer.discountedAmount.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${order.courierCharge > 0 ? `
+                        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ff9800;">
+                            <div style="font-weight: 600; color: #e65100; margin-bottom: 8px;">📦 Courier Charges</div>
+                            <div style="display: flex; justify-content: space-between; font-size: 14px; color: #e65100; margin-bottom: 5px;">
+                                <span>Total Weight:</span>
+                                <span>${order.totalWeight ? order.totalWeight.toFixed(2) : '0.00'} kg</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 14px; color: #e65100;">
+                                <span>Courier Charge:</span>
+                                <span>₹${order.courierCharge.toFixed(2)}</span>
                             </div>
                         </div>
                     ` : ''}

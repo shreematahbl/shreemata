@@ -22,7 +22,7 @@ router.get("/", async (req, res) => {
                 { validUntil: null }
             ]
         })
-        .populate("books", "title author cover_image price")
+        .populate("books", "title author cover_image price weight")
         .sort({ createdAt: -1 });
 
         res.json({ bundles });
@@ -38,7 +38,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
     try {
         const bundle = await Bundle.findById(req.params.id)
-            .populate("books", "title author cover_image price description");
+            .populate("books", "title author cover_image price description weight");
 
         if (!bundle) {
             return res.status(404).json({ error: "Bundle not found" });
@@ -68,14 +68,24 @@ router.post("/admin/create", authenticateToken, isAdmin, async (req, res) => {
             });
         }
 
-        // Fetch books to calculate original price
+        // Fetch books to calculate original price and weight
         const books = await Book.find({ _id: { $in: bookIds } });
         
         if (books.length !== bookIds.length) {
             return res.status(400).json({ error: "Some books not found" });
         }
 
+        console.log("=== Bundle Creation - Weight Calculation ===");
+        console.log("Number of books:", books.length);
+        books.forEach((book, index) => {
+            console.log(`Book ${index + 1}: ${book.title} - Weight: ${book.weight || 0.5} kg`);
+        });
+
         const originalPrice = books.reduce((sum, book) => sum + book.price, 0);
+        const totalWeight = books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
+
+        console.log("Total Weight Calculated:", totalWeight, "kg");
+        console.log("==========================================");
 
         if (bundlePrice >= originalPrice) {
             return res.status(400).json({ 
@@ -89,12 +99,13 @@ router.post("/admin/create", authenticateToken, isAdmin, async (req, res) => {
             books: bookIds,
             originalPrice,
             bundlePrice,
+            weight: totalWeight,
             image,
             validUntil: validUntil || null
         });
 
         const populatedBundle = await Bundle.findById(bundle._id)
-            .populate("books", "title author cover_image price");
+            .populate("books", "title author cover_image price weight");
 
         res.json({ 
             message: "Bundle created successfully", 
@@ -113,7 +124,7 @@ router.post("/admin/create", authenticateToken, isAdmin, async (req, res) => {
 router.get("/admin/all", authenticateToken, isAdmin, async (req, res) => {
     try {
         const bundles = await Bundle.find()
-            .populate("books", "title author cover_image price")
+            .populate("books", "title author cover_image price weight")
             .sort({ createdAt: -1 });
 
         res.json({ bundles });
@@ -142,7 +153,7 @@ router.put("/admin/update/:id", authenticateToken, isAdmin, async (req, res) => 
         if (validUntil !== undefined) bundle.validUntil = validUntil;
         if (isActive !== undefined) bundle.isActive = isActive;
 
-        // If books changed, recalculate original price
+        // If books changed, recalculate original price and weight
         if (bookIds && bookIds.length >= 1) {
             const books = await Book.find({ _id: { $in: bookIds } });
             if (books.length !== bookIds.length) {
@@ -150,6 +161,7 @@ router.put("/admin/update/:id", authenticateToken, isAdmin, async (req, res) => 
             }
             bundle.books = bookIds;
             bundle.originalPrice = books.reduce((sum, book) => sum + book.price, 0);
+            bundle.weight = books.reduce((sum, book) => sum + (book.weight || 0.5), 0);
         }
 
         // Update bundle price
@@ -165,7 +177,7 @@ router.put("/admin/update/:id", authenticateToken, isAdmin, async (req, res) => 
         await bundle.save();
 
         const updatedBundle = await Bundle.findById(bundle._id)
-            .populate("books", "title author cover_image price");
+            .populate("books", "title author cover_image price weight");
 
         res.json({ 
             message: "Bundle updated successfully", 

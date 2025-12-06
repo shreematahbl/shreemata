@@ -75,8 +75,21 @@ function setupSignupForm() {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
 
+                // Migrate guest cart to user cart
+                if (typeof migrateGuestCartToUser === 'function') {
+                    migrateGuestCartToUser();
+                }
+
                 alert('Account created successfully!');
-                window.location.href = '/';
+                
+                // Check if there's a redirect URL stored
+                const redirectUrl = localStorage.getItem("redirectAfterLogin");
+                if (redirectUrl) {
+                    localStorage.removeItem("redirectAfterLogin");
+                    window.location.href = redirectUrl;
+                } else {
+                    window.location.href = '/';
+                }
             } else {
                 errorMessage.textContent = data.error || 'Signup failed. Please try again.';
                 errorMessage.style.display = 'block';

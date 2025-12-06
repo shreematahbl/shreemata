@@ -40,7 +40,19 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("token", data.token);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            window.location.href = "/";
+            // Migrate guest cart to user cart
+            if (typeof migrateGuestCartToUser === 'function') {
+                migrateGuestCartToUser();
+            }
+
+            // Check if there's a redirect URL stored
+            const redirectUrl = localStorage.getItem("redirectAfterLogin");
+            if (redirectUrl) {
+                localStorage.removeItem("redirectAfterLogin");
+                window.location.href = redirectUrl;
+            } else {
+                window.location.href = "/";
+            }
         } catch (err) {
             console.error("Login error:", err);
             errorMessage.textContent = "Network error. Please try again.";
