@@ -4,8 +4,12 @@ const origin = window.location.origin;
 
 // If not localhost → hosted mode
 if (!origin.includes("localhost")) {
-    // Use main domain with /api path
-    API_URL = origin + "/api";
+    // Use subdomain to bypass Cloudflare for large uploads
+    if (origin.includes("shreemata.com")) {
+        API_URL = "https://api.shreemata.com";
+    } else {
+        API_URL = origin + "/api";
+    }
 }
 // Local development
 else {

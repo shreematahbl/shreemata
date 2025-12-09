@@ -79,6 +79,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Cloudinary config endpoint (for direct uploads from browser)
+app.get('/api/cloudinary-config', (req, res) => {
+  res.json({
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'bookstore_preset'
+  });
+});
+
 // Static
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use(express.static(path.join(__dirname, 'public')));

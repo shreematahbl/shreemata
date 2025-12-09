@@ -239,51 +239,93 @@ async function deleteBook(bookId) {
 async function handleFormSubmit(e) {
     e.preventDefault();
 
-    const formData = new FormData();
-    formData.append('title', document.getElementById('title').value);
-    formData.append('author', document.getElementById('author').value);
-    formData.append('price', document.getElementById('price').value);
-    formData.append('description', document.getElementById('description').value);
-    formData.append('category', document.getElementById('category').value);
-    formData.append('weight', document.getElementById('weight').value);
-    formData.append('rewardPoints', document.getElementById('rewardPoints').value);
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading images...';
 
-    const cover = document.getElementById('coverImage').files[0];
-    if (cover) formData.append('coverImage', cover);
+    try {
+        // Get form data
+        const title = document.getElementById('title').value;
+        const author = document.getElementById('author').value;
+        const price = document.getElementById('price').value;
+        const description = document.getElementById('description').value;
+        const category = document.getElementById('category').value;
+        const weight = document.getElementById('weight').value;
+        const rewardPoints = document.getElementById('rewardPoints').value;
 
-    const previews = document.getElementById('previewImages').files;
-    for (let i = 0; i < previews.length; i++) {
-        formData.append('previewImages', previews[i]);
-    }
+        // Upload images directly to Cloudinary
+        let coverImageUrl = '';
+        let previewImageUrls = [];
 
-    const token = localStorage.getItem('token');
-    const url = isEditMode ? `${API}/books/${editingBookId}` : `${API}/books`;
-    const method = isEditMode ? "PUT" : "POST";
+        const coverFile = document.getElementById('coverImage').files[0];
+        if (coverFile) {
+            submitBtn.textContent = 'Uploading cover image...';
+            coverImageUrl = await window.cloudinaryUpload.uploadToCloudinary(coverFile);
+        } else if (!isEditMode) {
+            alert('Cover image is required');
+            return;
+        }
 
-    const res = await fetch(url, {
-        method,
-        headers: { "Authorization": `Bearer ${token}` },
-        body: formData
-    });
+        const previewFiles = document.getElementById('previewImages').files;
+        if (previewFiles.length > 0) {
+            submitBtn.textContent = `Uploading preview images (${previewFiles.length})...`;
+            previewImageUrls = await window.cloudinaryUpload.uploadMultipleToCloudinary(previewFiles);
+        }
 
-    // Check if response is JSON
-    const contentType = res.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-        const text = await res.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
-        alert('Server error: Received invalid response. Please check:\n- File sizes (max 10MB per file)\n- Image formats (JPG, PNG, WEBP only)\n- Server is running properly');
-        return;
-    }
+        // Send book data to server (without images)
+        submitBtn.textContent = 'Saving book...';
+        const bookData = {
+            title,
+            author,
+            price,
+            description,
+            category,
+            weight,
+            rewardPoints
+        };
 
-    const data = await res.json();
+        // Only include image URLs if they were uploaded
+        if (coverImageUrl) bookData.cover_image = coverImageUrl;
+        if (previewImageUrls.length > 0) bookData.preview_images = previewImageUrls;
 
-    if (res.ok) {
-        alert(data.message);
-        resetForm();
-        loadBooks();
-    } else {
-        // Show specific error message
-        alert(`Error: ${data.error || 'Failed to save book'}\n${data.details || ''}`);
+        const token = localStorage.getItem('token');
+        const url = isEditMode ? `${API}/books/${editingBookId}` : `${API}/books`;
+        const method = isEditMode ? "PUT" : "POST";
+
+        const res = await fetch(url, {
+            method,
+            headers: { 
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(bookData)
+        });
+
+        // Check if response is JSON
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            alert('Server error: Received invalid response. Check console for details.');
+            return;
+        }
+
+        const data = await res.json();
+
+        if (res.ok) {
+            alert(data.message);
+            resetForm();
+            loadBooks();
+        } else {
+            alert(`Error: ${data.error || 'Failed to save book'}\n${data.details || ''}`);
+        }
+    } catch (err) {
+        console.error('Error submitting form:', err);
+        alert(`Error: ${err.message}`);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
     }
 }
 
