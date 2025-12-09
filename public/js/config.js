@@ -4,12 +4,9 @@ const origin = window.location.origin;
 
 // If not localhost → hosted mode
 if (!origin.includes("localhost")) {
-    // Use subdomain to bypass Cloudflare for large uploads
-    if (origin.includes("shreemata.com")) {
-        API_URL = "https://api.shreemata.com";
-    } else {
-        API_URL = origin + "/api";
-    }
+    // Use main domain with /api path
+    // Direct Cloudinary uploads bypass Cloudflare anyway
+    API_URL = origin + "/api";
 }
 // Local development
 else {
