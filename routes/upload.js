@@ -2,6 +2,7 @@
 const express = require('express');
 const multer = require('multer');
 const { Readable } = require('stream');
+const { ObjectId } = require('mongodb');
 const { getGridFSBucket } = require('../config/gridfs');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
 
@@ -33,6 +34,8 @@ router.post('/image', authenticateToken, isAdmin, upload.single('image'), async 
       return res.status(400).json({ error: 'No image file provided' });
     }
 
+    console.log('📤 Uploading file:', req.file.originalname, 'Size:', req.file.size);
+
     const bucket = getGridFSBucket();
     const filename = `${Date.now()}-${req.file.originalname}`;
 
@@ -44,26 +47,38 @@ router.post('/image', authenticateToken, isAdmin, upload.single('image'), async 
       }
     });
 
+    // Handle errors before piping
+    let errorOccurred = false;
+
+    uploadStream.on('error', (err) => {
+      console.error('❌ GridFS upload error:', err);
+      errorOccurred = true;
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Upload failed', details: err.message });
+      }
+    });
+
+    uploadStream.on('finish', () => {
+      if (!errorOccurred && !res.headersSent) {
+        const fileUrl = `/api/files/${uploadStream.id}`;
+        console.log('✅ Upload successful:', fileUrl);
+        res.json({
+          message: 'Image uploaded successfully',
+          url: fileUrl,
+          fileId: uploadStream.id.toString()
+        });
+      }
+    });
+
+    // Pipe the buffer to GridFS
     const readableStream = Readable.from(req.file.buffer);
     readableStream.pipe(uploadStream);
 
-    uploadStream.on('finish', () => {
-      const fileUrl = `/api/files/${uploadStream.id}`;
-      res.json({
-        message: 'Image uploaded successfully',
-        url: fileUrl,
-        fileId: uploadStream.id
-      });
-    });
-
-    uploadStream.on('error', (err) => {
-      console.error('GridFS upload error:', err);
-      res.status(500).json({ error: 'Upload failed' });
-    });
-
   } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Error uploading image' });
+    console.error('❌ Upload error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error uploading image', details: err.message });
+    }
   }
 });
 
@@ -75,6 +90,8 @@ router.post('/images', authenticateToken, isAdmin, upload.array('images', 10), a
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No image files provided' });
     }
+
+    console.log(`📤 Uploading ${req.files.length} files`);
 
     const bucket = getGridFSBucket();
     const uploadPromises = req.files.map(file => {
@@ -88,30 +105,34 @@ router.post('/images', authenticateToken, isAdmin, upload.array('images', 10), a
           }
         });
 
-        const readableStream = Readable.from(file.buffer);
-        readableStream.pipe(uploadStream);
+        uploadStream.on('error', (err) => {
+          console.error('❌ Upload stream error:', err);
+          reject(err);
+        });
 
         uploadStream.on('finish', () => {
           resolve({
             url: `/api/files/${uploadStream.id}`,
-            fileId: uploadStream.id
+            fileId: uploadStream.id.toString()
           });
         });
 
-        uploadStream.on('error', reject);
+        const readableStream = Readable.from(file.buffer);
+        readableStream.pipe(uploadStream);
       });
     });
 
     const results = await Promise.all(uploadPromises);
 
+    console.log('✅ All files uploaded successfully');
     res.json({
       message: 'Images uploaded successfully',
       files: results
     });
 
   } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Error uploading images' });
+    console.error('❌ Upload error:', err);
+    res.status(500).json({ error: 'Error uploading images', details: err.message });
   }
 });
 
@@ -120,16 +141,29 @@ router.post('/images', authenticateToken, isAdmin, upload.array('images', 10), a
 ------------------------------------------- */
 router.get('/:fileId', async (req, res) => {
   try {
+    console.log('📥 Retrieving file:', req.params.fileId);
+    
     const bucket = getGridFSBucket();
-    const fileId = new require('mongodb').ObjectId(req.params.fileId);
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(req.params.fileId)) {
+      console.error('❌ Invalid ObjectId format:', req.params.fileId);
+      return res.status(400).json({ error: 'Invalid file ID format' });
+    }
+
+    const fileId = new ObjectId(req.params.fileId);
+    console.log('🔍 Looking for file with ObjectId:', fileId);
 
     const files = await bucket.find({ _id: fileId }).toArray();
+    console.log('📋 Files found:', files.length);
 
     if (!files || files.length === 0) {
+      console.error('❌ File not found in GridFS:', fileId);
       return res.status(404).json({ error: 'File not found' });
     }
 
     const file = files[0];
+    console.log('✅ File found:', file.filename, 'Type:', file.contentType);
 
     res.set('Content-Type', file.contentType || 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
@@ -138,15 +172,18 @@ router.get('/:fileId', async (req, res) => {
     downloadStream.pipe(res);
 
     downloadStream.on('error', (err) => {
-      console.error('Download error:', err);
+      console.error('❌ Download stream error:', err);
       if (!res.headersSent) {
         res.status(404).json({ error: 'File not found' });
       }
     });
 
   } catch (err) {
-    console.error('File retrieval error:', err);
-    res.status(500).json({ error: 'Error retrieving file' });
+    console.error('❌ File retrieval error:', err);
+    console.error('Stack:', err.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error retrieving file', details: err.message });
+    }
   }
 });
 
@@ -156,15 +193,21 @@ router.get('/:fileId', async (req, res) => {
 router.delete('/:fileId', authenticateToken, isAdmin, async (req, res) => {
   try {
     const bucket = getGridFSBucket();
-    const fileId = new require('mongodb').ObjectId(req.params.fileId);
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(req.params.fileId)) {
+      return res.status(400).json({ error: 'Invalid file ID format' });
+    }
+
+    const fileId = new ObjectId(req.params.fileId);
 
     await bucket.delete(fileId);
 
     res.json({ message: 'File deleted successfully' });
 
   } catch (err) {
-    console.error('File deletion error:', err);
-    res.status(500).json({ error: 'Error deleting file' });
+    console.error('❌ File deletion error:', err);
+    res.status(500).json({ error: 'Error deleting file', details: err.message });
   }
 });
 
