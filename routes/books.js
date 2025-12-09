@@ -1,11 +1,37 @@
 // routes/books.js
 const express = require("express");
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 
 const Book = require("../models/Book");
 const Purchase = require("../models/Purchase");
 const { authenticateToken, isAdmin } = require("../middleware/auth");
 
 const router = express.Router();
+
+/* -------------------------------------------
+   CLOUDINARY STORAGE SETUP
+------------------------------------------- */
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async () => ({
+    folder: "bookstore",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"]
+  })
+});
+
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB per file
+  }
+});
+
+const uploadImages = upload.fields([
+  { name: "coverImage", maxCount: 1 },
+  { name: "previewImages", maxCount: 4 }
+]);
 
 /* -------------------------------------------
    GET ALL BOOKS WITH FILTERS + PAGINATION
@@ -73,64 +99,84 @@ router.get("/:id", async (req, res) => {
 
 /* -------------------------------------------
    ADD NEW BOOK (ADMIN ONLY)
-   Expects JSON with image URLs from GridFS upload
+   Supports direct Cloudinary upload (JSON) or server upload (multipart)
 ------------------------------------------- */
-router.post("/", authenticateToken, isAdmin, async (req, res) => {
+router.post("/", authenticateToken, isAdmin, (req, res, next) => {
+  const contentType = req.headers['content-type'];
+  if (contentType && contentType.includes('application/json')) {
+    return next();
+  }
+  
+  uploadImages(req, res, (err) => {
+    if (err) {
+      console.error("Upload error:", err);
+      return res.status(500).json({ error: "Upload failed", details: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { title, author, price, description, category, weight, rewardPoints, cover_image, preview_images } = req.body;
-    console.log('📝 Book data:', { title, author, price, category });
 
-    // Validate required fields
     if (!title || !author || !price) {
-      console.log('❌ Missing required fields');
-      return res.status(400).json({ 
-        error: "Missing required fields", 
-        details: "Title, author, and price are required" 
-      });
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Validate cover image
-    if (!cover_image) {
-      console.log('❌ No cover image provided');
-      return res.status(400).json({ 
-        error: "Cover image is required",
-        details: "Please upload a cover image for the book"
-      });
+    let coverImage = cover_image;
+    let previewImages = preview_images || [];
+
+    if (req.files) {
+      if (req.files["coverImage"]) {
+        coverImage = req.files["coverImage"][0].path;
+      }
+      if (req.files["previewImages"]) {
+        previewImages = req.files["previewImages"].map(f => f.path);
+      }
     }
 
-    console.log('🖼️ Images:', { cover_image, previewCount: (preview_images || []).length });
+    if (!coverImage) {
+      return res.status(400).json({ error: "Cover image is required" });
+    }
 
     const book = await Book.create({
       title,
       author,
       price,
       description: description || "",
-      cover_image,
-      preview_images: preview_images || [],
+      cover_image: coverImage,
+      preview_images: previewImages,
       category: category || "uncategorized",
       weight: weight || 0.5,
       rewardPoints: rewardPoints || 0
     });
 
-    console.log('✅ Book created successfully:', book._id);
     res.status(201).json({ message: "Book added successfully", book });
   } catch (err) {
-    console.error("❌ Error adding book:", err);
-    res.status(500).json({ 
-      error: "Error adding book", 
-      details: err.message 
-    });
+    console.error("Error adding book:", err);
+    res.status(500).json({ error: "Error adding book", details: err.message });
   }
 });
 
 /* -------------------------------------------
    UPDATE BOOK (ADMIN ONLY)
-   Expects JSON with image URLs from GridFS upload
+   Supports direct Cloudinary upload (JSON) or server upload (multipart)
 ------------------------------------------- */
-router.put("/:id", authenticateToken, isAdmin, async (req, res) => {
+router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
+  const contentType = req.headers['content-type'];
+  if (contentType && contentType.includes('application/json')) {
+    return next();
+  }
+  
+  uploadImages(req, res, (err) => {
+    if (err) {
+      console.error("Upload error:", err);
+      return res.status(500).json({ error: "Upload failed", details: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
-
     if (!book) return res.status(404).json({ error: "Book not found" });
 
     book.title = req.body.title || book.title;
@@ -141,7 +187,6 @@ router.put("/:id", authenticateToken, isAdmin, async (req, res) => {
     book.weight = req.body.weight !== undefined ? req.body.weight : book.weight;
     book.rewardPoints = req.body.rewardPoints !== undefined ? req.body.rewardPoints : book.rewardPoints;
 
-    // Handle images from JSON body
     if (req.body.cover_image) {
       book.cover_image = req.body.cover_image;
     }
@@ -149,15 +194,18 @@ router.put("/:id", authenticateToken, isAdmin, async (req, res) => {
       book.preview_images = req.body.preview_images;
     }
 
+    if (req.files && req.files["coverImage"]) {
+      book.cover_image = req.files["coverImage"][0].path;
+    }
+    if (req.files && req.files["previewImages"]) {
+      book.preview_images = req.files["previewImages"].map(f => f.path);
+    }
+
     await book.save();
     res.json({ message: "Book updated successfully", book });
-
   } catch (err) {
     console.error("Error updating book:", err);
-    res.status(500).json({ 
-      error: "Error updating book", 
-      details: err.message 
-    });
+    res.status(500).json({ error: "Error updating book", details: err.message });
   }
 });
 

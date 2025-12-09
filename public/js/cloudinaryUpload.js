@@ -1,42 +1,59 @@
 /**
- * GridFS Upload (MongoDB)
- * This uploads images to our server which stores them in MongoDB GridFS
+ * Direct Cloudinary Upload (Bypasses Server)
+ * This uploads images directly from browser to Cloudinary
  */
 
+// Get Cloudinary config from server
+let cloudinaryConfig = null;
+
+async function getCloudinaryConfig() {
+    if (cloudinaryConfig) return cloudinaryConfig;
+    
+    try {
+        const res = await fetch(`${window.API_URL}/cloudinary-config`);
+        cloudinaryConfig = await res.json();
+        return cloudinaryConfig;
+    } catch (err) {
+        console.error('Failed to get Cloudinary config:', err);
+        return null;
+    }
+}
+
 /**
- * Upload file to GridFS
+ * Upload file directly to Cloudinary
  * @param {File} file - The file to upload
  * @returns {Promise<string>} - The uploaded image URL
  */
-async function uploadToGridFS(file) {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        throw new Error('Authentication required');
+async function uploadToCloudinary(file) {
+    const config = await getCloudinaryConfig();
+    if (!config) {
+        throw new Error('Cloudinary configuration not available');
     }
 
-    console.log('📤 Uploading to GridFS:', file.name);
+    console.log('📤 Uploading to Cloudinary:', file.name);
 
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('file', file);
+    formData.append('upload_preset', config.uploadPreset);
 
     try {
-        const response = await fetch(`${window.API_URL}/upload/image`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: formData
-        });
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
+            {
+                method: 'POST',
+                body: formData
+            }
+        );
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            console.error('❌ Upload error:', errorData);
-            throw new Error(`Upload failed: ${errorData.error || response.statusText}`);
+            console.error('❌ Cloudinary error:', errorData);
+            throw new Error(`Cloudinary upload failed: ${errorData.error?.message || response.statusText}`);
         }
 
         const data = await response.json();
-        console.log('✅ Upload successful:', data.url);
-        return data.url;
+        console.log('✅ Upload successful:', data.secure_url);
+        return data.secure_url;
     } catch (error) {
         console.error('❌ Upload error:', error);
         throw error;
@@ -44,17 +61,17 @@ async function uploadToGridFS(file) {
 }
 
 /**
- * Upload multiple files to GridFS
+ * Upload multiple files to Cloudinary
  * @param {FileList} files - The files to upload
  * @returns {Promise<string[]>} - Array of uploaded image URLs
  */
-async function uploadMultipleToGridFS(files) {
-    const uploadPromises = Array.from(files).map(file => uploadToGridFS(file));
+async function uploadMultipleToCloudinary(files) {
+    const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
     return Promise.all(uploadPromises);
 }
 
-// Export functions (keeping same interface for compatibility)
+// Export functions
 window.cloudinaryUpload = {
-    uploadToCloudinary: uploadToGridFS,
-    uploadMultipleToCloudinary: uploadMultipleToGridFS
+    uploadToCloudinary,
+    uploadMultipleToCloudinary
 };
