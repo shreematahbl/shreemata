@@ -30,25 +30,36 @@ async function uploadToCloudinary(file) {
         throw new Error('Cloudinary configuration not available');
     }
 
+    console.log('📤 Uploading to Cloudinary:', file.name);
+    console.log('Config:', config);
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', config.uploadPreset);
-    formData.append('folder', 'bookstore');
+    // Don't specify folder here - let the preset handle it
 
-    const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
-        {
-            method: 'POST',
-            body: formData
+    try {
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
+            {
+                method: 'POST',
+                body: formData
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('❌ Cloudinary error:', errorData);
+            throw new Error(`Cloudinary upload failed: ${errorData.error?.message || response.statusText}`);
         }
-    );
 
-    if (!response.ok) {
-        throw new Error('Cloudinary upload failed');
+        const data = await response.json();
+        console.log('✅ Upload successful:', data.secure_url);
+        return data.secure_url;
+    } catch (error) {
+        console.error('❌ Upload error:', error);
+        throw error;
     }
-
-    const data = await response.json();
-    return data.secure_url;
 }
 
 /**
