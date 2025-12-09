@@ -262,17 +262,14 @@ async function handleFormSubmit(e) {
             return;
         }
 
-        // TEMPORARILY DISABLED: Direct Cloudinary upload
-        // Using server upload for all requests until upload preset is configured
+        // Upload images to GridFS
         let useDirectUpload = false;
         let coverImageUrl = '';
         let previewImageUrls = [];
 
-        // Uncomment below when bookstore_preset is properly configured in Cloudinary
-        /*
         if (window.cloudinaryUpload && coverFile) {
             try {
-                submitBtn.textContent = 'Uploading cover image to Cloudinary...';
+                submitBtn.textContent = 'Uploading cover image...';
                 coverImageUrl = await window.cloudinaryUpload.uploadToCloudinary(coverFile);
                 
                 if (previewFiles.length > 0) {
@@ -280,12 +277,14 @@ async function handleFormSubmit(e) {
                     previewImageUrls = await window.cloudinaryUpload.uploadMultipleToCloudinary(previewFiles);
                 }
                 useDirectUpload = true;
-            } catch (cloudinaryError) {
-                console.warn('⚠️ Direct Cloudinary upload failed, falling back to server upload:', cloudinaryError);
-                useDirectUpload = false;
+            } catch (uploadError) {
+                console.error('❌ Upload failed:', uploadError);
+                alert('Image upload failed: ' + uploadError.message);
+                submitBtn.disabled = false;
+                submitBtn.textContent = isEditMode ? 'Update Book' : 'Add Book';
+                return;
             }
         }
-        */
 
         const token = localStorage.getItem('token');
         const url = isEditMode ? `${API}/books/${editingBookId}` : `${API}/books`;
@@ -316,27 +315,32 @@ async function handleFormSubmit(e) {
                 },
                 body: JSON.stringify(bookData)
             });
+        } else if (!isEditMode) {
+            // No images uploaded and not in edit mode
+            alert('Please upload a cover image');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Add Book';
+            return;
         } else {
-            // Fallback: Send multipart form data (server will upload to Cloudinary)
-            submitBtn.textContent = 'Uploading via server...';
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('author', author);
-            formData.append('price', price);
-            formData.append('description', description);
-            formData.append('category', category);
-            formData.append('weight', weight);
-            formData.append('rewardPoints', rewardPoints);
-
-            if (coverFile) formData.append('coverImage', coverFile);
-            for (let i = 0; i < previewFiles.length; i++) {
-                formData.append('previewImages', previewFiles[i]);
-            }
+            // Edit mode without new images - send JSON with existing data
+            submitBtn.textContent = 'Saving book...';
+            const bookData = {
+                title,
+                author,
+                price,
+                description,
+                category,
+                weight,
+                rewardPoints
+            };
 
             res = await fetch(url, {
                 method,
-                headers: { "Authorization": `Bearer ${token}` },
-                body: formData
+                headers: { 
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(bookData)
             });
         }
 

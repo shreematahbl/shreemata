@@ -5,7 +5,6 @@ const origin = window.location.origin;
 // If not localhost → hosted mode
 if (!origin.includes("localhost")) {
     // Use main domain with /api path
-    // Direct Cloudinary uploads bypass Cloudflare anyway
     API_URL = origin + "/api";
 }
 // Local development

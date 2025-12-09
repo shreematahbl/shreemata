@@ -4,17 +4,21 @@ const path = require("path");
 require("dotenv").config();
 
 const connectDB = require("./config/mongo");
+const { initGridFS } = require("./config/gridfs");
 const authRoutes = require("./routes/auth");
 const bookRoutes = require("./routes/books");
 const categoryRoutes = require("./routes/categories");
 const orderRoutes = require("./routes/orders");
 const paymentRoutes = require("./routes/payments");
+const uploadRoutes = require("./routes/upload");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Connect DB
-connectDB();
+// Connect DB and initialize GridFS
+connectDB().then(() => {
+  initGridFS();
+});
 
 // CORS - Allow requests from main domain and API subdomain
 app.use(cors({
@@ -55,6 +59,8 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api", authRoutes);
 app.use("/api/books", bookRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/files", uploadRoutes);
 app.use("/api/referral", require("./routes/referral"));
 app.use("/api/referral", require("./routes/referralTree"));
 app.use("/api/admin/withdrawals", require("./routes/adminWithdraw"));
@@ -79,13 +85,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Cloudinary config endpoint (for direct uploads from browser)
-app.get('/api/cloudinary-config', (req, res) => {
-  res.json({
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-    uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || 'bookstore_preset'
-  });
-});
+// Removed Cloudinary config endpoint - now using MongoDB GridFS
 
 // Static
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));

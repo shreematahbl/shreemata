@@ -1,37 +1,11 @@
 // routes/books.js
 const express = require("express");
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../config/cloudinary");
 
 const Book = require("../models/Book");
 const Purchase = require("../models/Purchase");
 const { authenticateToken, isAdmin } = require("../middleware/auth");
 
 const router = express.Router();
-
-/* -------------------------------------------
-   CLOUDINARY STORAGE SETUP
-------------------------------------------- */
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async () => ({
-    folder: "bookstore",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"]
-  })
-});
-
-const upload = multer({ 
-  storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB per file
-  }
-});
-
-const uploadImages = upload.fields([
-  { name: "coverImage", maxCount: 1 },
-  { name: "previewImages", maxCount: 4 }
-]);
 
 /* -------------------------------------------
    GET ALL BOOKS WITH FILTERS + PAGINATION
@@ -99,37 +73,9 @@ router.get("/:id", async (req, res) => {
 
 /* -------------------------------------------
    ADD NEW BOOK (ADMIN ONLY)
-   Supports both multipart (server upload) and JSON (direct Cloudinary upload)
+   Expects JSON with image URLs from GridFS upload
 ------------------------------------------- */
-router.post("/", authenticateToken, isAdmin, (req, res, next) => {
-  // Check if this is a JSON request (direct Cloudinary upload)
-  const contentType = req.headers['content-type'];
-  if (contentType && contentType.includes('application/json')) {
-    console.log('📤 POST /api/books - JSON mode (direct Cloudinary upload)');
-    return next();
-  }
-
-  // Otherwise, handle multipart upload
-  console.log('📤 POST /api/books - Multipart mode (server upload)');
-  uploadImages(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      console.error("❌ Multer error:", err);
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: "File too large. Maximum size is 10MB per file." });
-      }
-      return res.status(400).json({ error: `Upload error: ${err.message}` });
-    } else if (err) {
-      console.error("❌ Upload error:", err);
-      return res.status(500).json({ 
-        error: "Upload failed", 
-        details: err.message,
-        hint: "Check Cloudinary credentials and network connection"
-      });
-    }
-    console.log('✅ Upload successful, processing book data...');
-    next();
-  });
-}, async (req, res) => {
+router.post("/", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { title, author, price, description, category, weight, rewardPoints, cover_image, preview_images } = req.body;
     console.log('📝 Book data:', { title, author, price, category });
@@ -143,22 +89,8 @@ router.post("/", authenticateToken, isAdmin, (req, res, next) => {
       });
     }
 
-    // Get image URLs (either from JSON body or uploaded files)
-    let coverImage = cover_image; // From JSON (direct Cloudinary)
-    let previewImages = preview_images || []; // From JSON
-
-    // If multipart upload, get from req.files
-    if (req.files) {
-      if (req.files["coverImage"]) {
-        coverImage = req.files["coverImage"][0].path;
-      }
-      if (req.files["previewImages"]) {
-        previewImages = req.files["previewImages"].map(f => f.path);
-      }
-    }
-
     // Validate cover image
-    if (!coverImage) {
+    if (!cover_image) {
       console.log('❌ No cover image provided');
       return res.status(400).json({ 
         error: "Cover image is required",
@@ -166,15 +98,15 @@ router.post("/", authenticateToken, isAdmin, (req, res, next) => {
       });
     }
 
-    console.log('🖼️ Images:', { coverImage, previewCount: previewImages.length });
+    console.log('🖼️ Images:', { cover_image, previewCount: (preview_images || []).length });
 
     const book = await Book.create({
       title,
       author,
       price,
       description: description || "",
-      cover_image: coverImage,
-      preview_images: previewImages,
+      cover_image,
+      preview_images: preview_images || [],
       category: category || "uncategorized",
       weight: weight || 0.5,
       rewardPoints: rewardPoints || 0
@@ -193,36 +125,9 @@ router.post("/", authenticateToken, isAdmin, (req, res, next) => {
 
 /* -------------------------------------------
    UPDATE BOOK (ADMIN ONLY)
-   Supports both multipart (server upload) and JSON (direct Cloudinary upload)
+   Expects JSON with image URLs from GridFS upload
 ------------------------------------------- */
-router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
-  // Check if this is a JSON request (direct Cloudinary upload)
-  const contentType = req.headers['content-type'];
-  if (contentType && contentType.includes('application/json')) {
-    console.log('📝 PUT /api/books/:id - JSON mode (direct Cloudinary upload)');
-    return next();
-  }
-
-  // Otherwise, handle multipart upload
-  console.log('📝 PUT /api/books/:id - Multipart mode (server upload)');
-  uploadImages(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      console.error("Multer error:", err);
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: "File too large. Maximum size is 10MB per file." });
-      }
-      return res.status(400).json({ error: `Upload error: ${err.message}` });
-    } else if (err) {
-      console.error("Upload error:", err);
-      return res.status(500).json({ 
-        error: "Upload failed", 
-        details: err.message,
-        hint: "Check Cloudinary credentials and network connection"
-      });
-    }
-    next();
-  });
-}, async (req, res) => {
+router.put("/:id", authenticateToken, isAdmin, async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
 
@@ -236,20 +141,12 @@ router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
     book.weight = req.body.weight !== undefined ? req.body.weight : book.weight;
     book.rewardPoints = req.body.rewardPoints !== undefined ? req.body.rewardPoints : book.rewardPoints;
 
-    // Handle images from JSON body (direct Cloudinary)
+    // Handle images from JSON body
     if (req.body.cover_image) {
       book.cover_image = req.body.cover_image;
     }
     if (req.body.preview_images) {
       book.preview_images = req.body.preview_images;
-    }
-
-    // Handle images from multipart upload
-    if (req.files && req.files["coverImage"]) {
-      book.cover_image = req.files["coverImage"][0].path;
-    }
-    if (req.files && req.files["previewImages"]) {
-      book.preview_images = req.files["previewImages"].map(f => f.path);
     }
 
     await book.save();
@@ -308,27 +205,6 @@ router.post("/:id/purchase", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("Error processing purchase:", err);
     res.status(500).json({ error: "Error processing purchase" });
-  }
-});
-
-/* -------------------------------------------
-   UPLOAD SINGLE IMAGE (for bundles, etc.)
-------------------------------------------- */
-const singleUpload = upload.single("image");
-
-router.post("/upload-image", authenticateToken, isAdmin, singleUpload, async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No image file provided" });
-    }
-
-    res.json({ 
-      message: "Image uploaded successfully",
-      url: req.file.path 
-    });
-  } catch (err) {
-    console.error("Error uploading image:", err);
-    res.status(500).json({ error: "Error uploading image" });
   }
 });
 
