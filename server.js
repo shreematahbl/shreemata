@@ -92,18 +92,30 @@ app.get('/api/debug-cloudinary', (req, res) => {
 // Test Cloudinary connection
 app.get('/api/test-cloudinary', async (req, res) => {
   try {
-    const cloudinary = require('./config/cloudinary');
+    const crypto = require('crypto');
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME_NEW || process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY_NEW || process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET_NEW || process.env.CLOUDINARY_API_SECRET;
     
-    // Test with a simple text upload
-    const result = await cloudinary.uploader.upload('data:text/plain;base64,SGVsbG8gV29ybGQ=', {
-      resource_type: 'raw',
-      public_id: 'test-' + Date.now()
-    });
+    // Test signature generation manually
+    const timestamp = Math.round(Date.now() / 1000);
+    const publicId = `test-${timestamp}`;
+    
+    // Create signature manually
+    const stringToSign = `public_id=${publicId}&timestamp=${timestamp}`;
+    const signature = crypto.createHash('sha1').update(stringToSign + apiSecret).digest('hex');
     
     res.json({
       success: true,
-      message: 'Cloudinary connection working',
-      url: result.secure_url
+      message: 'Manual signature test',
+      cloudName,
+      apiKey,
+      apiSecret: apiSecret ? '***' + apiSecret.slice(-4) : 'NOT SET',
+      timestamp,
+      publicId,
+      stringToSign,
+      signature,
+      expectedUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
     });
   } catch (error) {
     res.status(500).json({
