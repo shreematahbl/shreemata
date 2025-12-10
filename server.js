@@ -79,6 +79,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug endpoint to check Cloudinary config (REMOVE AFTER TESTING)
+app.get('/api/debug-cloudinary', (req, res) => {
+  res.json({
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'NOT SET',
+    uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET
+  });
+});
+
 // Cloudinary config endpoint (for direct uploads from browser)
 app.get('/api/cloudinary-config', (req, res) => {
   res.json({
