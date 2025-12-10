@@ -68,7 +68,8 @@ app.use("/api/points", require("./routes/points"));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/sitemap.xml", (req, res) => {
-  res.header("Content-Type", "application/xml");
+  res.setHeader("Content-Type", "application/xml");
+  res.status(200);
   res.sendFile(path.join(__dirname, "public", "sitemap.xml"));
 });
 
