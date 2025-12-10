@@ -65,8 +65,12 @@ app.use("/api/admin", require("./routes/commissionSettings"));
 app.use("/api/bundles", require("./routes/bundles"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/points", require("./routes/points"));
+app.use(express.static(path.join(__dirname, "public")));
 
-
+app.get("/sitemap.xml", (req, res) => {
+  res.header("Content-Type", "application/xml");
+  res.sendFile(path.join(__dirname, "public", "sitemap.xml"));
+});
 
 
 // Health check endpoint
