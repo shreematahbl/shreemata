@@ -262,28 +262,13 @@ async function handleFormSubmit(e) {
             return;
         }
 
-        // Try direct Cloudinary upload first, fallback to server upload
+        // Use server upload only (direct Cloudinary has CORS issues)
         let useDirectUpload = false;
         let coverImageUrl = '';
         let previewImageUrls = [];
 
-        if (window.cloudinaryUpload && coverFile) {
-            try {
-                submitBtn.textContent = 'Uploading cover image to Cloudinary...';
-                coverImageUrl = await window.cloudinaryUpload.uploadToCloudinary(coverFile);
-                
-                if (previewFiles.length > 0) {
-                    submitBtn.textContent = `Uploading preview images (${previewFiles.length})...`;
-                    previewImageUrls = await window.cloudinaryUpload.uploadMultipleToCloudinary(previewFiles);
-                }
-                useDirectUpload = true;
-                console.log('✅ Direct Cloudinary upload successful');
-            } catch (uploadError) {
-                console.warn('⚠️ Direct Cloudinary upload failed, falling back to server upload:', uploadError);
-                useDirectUpload = false;
-                // Don't return here - let it fall through to server upload
-            }
-        }
+        // Skip direct upload for now due to CORS issues
+        console.log('📤 Using server upload (Cloudinary CORS disabled)');
 
         const token = localStorage.getItem('token');
         const url = isEditMode ? `${API}/books/${editingBookId}` : `${API}/books`;
@@ -315,8 +300,15 @@ async function handleFormSubmit(e) {
                 body: JSON.stringify(bookData)
             });
         } else if (coverFile || previewFiles.length > 0) {
-            // Fallback: Server upload via multipart form
-            submitBtn.textContent = 'Uploading via server...';
+            // Server upload via multipart form
+            submitBtn.textContent = 'Uploading images to server...';
+            
+            console.log('📤 Preparing server upload:', {
+                coverFile: coverFile?.name,
+                previewFiles: previewFiles.length,
+                title, author, price
+            });
+
             const formData = new FormData();
             formData.append('title', title);
             formData.append('author', author);
@@ -326,16 +318,25 @@ async function handleFormSubmit(e) {
             formData.append('weight', weight);
             formData.append('rewardPoints', rewardPoints);
 
-            if (coverFile) formData.append('coverImage', coverFile);
+            if (coverFile) {
+                console.log('📎 Adding cover image:', coverFile.name, coverFile.size, 'bytes');
+                formData.append('coverImage', coverFile);
+            }
+            
             for (let i = 0; i < previewFiles.length; i++) {
+                console.log('📎 Adding preview image:', previewFiles[i].name);
                 formData.append('previewImages', previewFiles[i]);
             }
+
+            console.log('🚀 Sending to:', url);
 
             res = await fetch(url, {
                 method,
                 headers: { "Authorization": `Bearer ${token}` },
                 body: formData
             });
+
+            console.log('📥 Server response:', res.status, res.statusText);
         } else if (!isEditMode) {
             // No images and not edit mode
             alert('Please upload a cover image');
