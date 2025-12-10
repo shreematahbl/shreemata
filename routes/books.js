@@ -27,14 +27,28 @@ const uploadImages = upload.fields([
   { name: "previewImages", maxCount: 4 }
 ]);
 
-// Helper function to upload buffer to Cloudinary
+// Helper function to upload buffer to Cloudinary with fresh config
 async function uploadToCloudinary(buffer, filename) {
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
+    // Create fresh Cloudinary instance with explicit config
+    const { v2: cloudinaryFresh } = require('cloudinary');
+    
+    cloudinaryFresh.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME_NEW || process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY_NEW || process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET_NEW || process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+
+    console.log('🔧 Using fresh Cloudinary config for upload:', {
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME_NEW || process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: (process.env.CLOUDINARY_API_KEY_NEW || process.env.CLOUDINARY_API_KEY) ? '***' + (process.env.CLOUDINARY_API_KEY_NEW || process.env.CLOUDINARY_API_KEY).slice(-4) : 'NOT SET'
+    });
+
+    // Try the simplest possible upload first
+    cloudinaryFresh.uploader.upload_stream(
       {
-        folder: "bookstore",
-        resource_type: "auto",
-        public_id: `${Date.now()}-${filename.replace(/\.[^/.]+$/, "")}`
+        resource_type: "auto"
       },
       (error, result) => {
         if (error) {
