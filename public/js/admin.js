@@ -300,14 +300,30 @@ async function handleFormSubmit(e) {
                 body: JSON.stringify(bookData)
             });
         } else if (coverFile || previewFiles.length > 0) {
-            // Server upload via multipart form
-            submitBtn.textContent = 'Uploading images to server...';
+            // Server upload via multipart form with compression
+            submitBtn.textContent = 'Compressing images...';
             
             console.log('📤 Preparing server upload:', {
                 coverFile: coverFile?.name,
                 previewFiles: previewFiles.length,
                 title, author, price
             });
+
+            // Compress images first
+            let compressedCoverFile = null;
+            let compressedPreviewFiles = [];
+
+            if (coverFile) {
+                console.log('📦 Compressing cover image...');
+                compressedCoverFile = await window.imageCompressor.compressImage(coverFile, 800, 1200, 0.8);
+            }
+
+            if (previewFiles.length > 0) {
+                console.log('� Codmpressing preview images...');
+                compressedPreviewFiles = await window.imageCompressor.compressMultipleImages(previewFiles);
+            }
+
+            submitBtn.textContent = 'Uploading images to server...';
 
             const formData = new FormData();
             formData.append('title', title);
@@ -318,14 +334,14 @@ async function handleFormSubmit(e) {
             formData.append('weight', weight);
             formData.append('rewardPoints', rewardPoints);
 
-            if (coverFile) {
-                console.log('📎 Adding cover image:', coverFile.name, coverFile.size, 'bytes');
-                formData.append('coverImage', coverFile);
+            if (compressedCoverFile) {
+                console.log('📎 Adding compressed cover image:', compressedCoverFile.name, compressedCoverFile.size, 'bytes');
+                formData.append('coverImage', compressedCoverFile);
             }
             
-            for (let i = 0; i < previewFiles.length; i++) {
-                console.log('📎 Adding preview image:', previewFiles[i].name);
-                formData.append('previewImages', previewFiles[i]);
+            for (let i = 0; i < compressedPreviewFiles.length; i++) {
+                console.log('📎 Adding compressed preview image:', compressedPreviewFiles[i].name, compressedPreviewFiles[i].size, 'bytes');
+                formData.append('previewImages', compressedPreviewFiles[i]);
             }
 
             console.log('🚀 Sending to:', url);
