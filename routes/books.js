@@ -15,10 +15,11 @@ const router = express.Router();
 ------------------------------------------- */
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async () => ({
+  params: {
     folder: "bookstore",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"]
-  })
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    resource_type: "auto"
+  }
 });
 
 const upload = multer({ 

@@ -89,6 +89,31 @@ app.get('/api/debug-cloudinary', (req, res) => {
   });
 });
 
+// Test Cloudinary connection
+app.get('/api/test-cloudinary', async (req, res) => {
+  try {
+    const cloudinary = require('./config/cloudinary');
+    
+    // Test with a simple text upload
+    const result = await cloudinary.uploader.upload('data:text/plain;base64,SGVsbG8gV29ybGQ=', {
+      resource_type: 'raw',
+      public_id: 'test-' + Date.now()
+    });
+    
+    res.json({
+      success: true,
+      message: 'Cloudinary connection working',
+      url: result.secure_url
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: error
+    });
+  }
+});
+
 // Cloudinary config endpoint (for direct uploads from browser)
 app.get('/api/cloudinary-config', (req, res) => {
   res.json({
