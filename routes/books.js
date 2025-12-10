@@ -1,7 +1,6 @@
 // routes/books.js
 const express = require("express");
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 
 const Book = require("../models/Book");
@@ -13,13 +12,8 @@ const router = express.Router();
 /* -------------------------------------------
    CLOUDINARY STORAGE SETUP
 ------------------------------------------- */
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "bookstore",
-    resource_type: "auto"
-  }
-});
+// Use memory storage and upload directly to Cloudinary
+const storage = multer.memoryStorage();
 
 const upload = multer({ 
   storage,
@@ -32,6 +26,28 @@ const uploadImages = upload.fields([
   { name: "coverImage", maxCount: 1 },
   { name: "previewImages", maxCount: 4 }
 ]);
+
+// Helper function to upload buffer to Cloudinary
+async function uploadToCloudinary(buffer, filename) {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      {
+        folder: "bookstore",
+        resource_type: "auto",
+        public_id: `${Date.now()}-${filename.replace(/\.[^/.]+$/, "")}`
+      },
+      (error, result) => {
+        if (error) {
+          console.error('❌ Cloudinary upload error:', error);
+          reject(error);
+        } else {
+          console.log('✅ Cloudinary upload success:', result.secure_url);
+          resolve(result.secure_url);
+        }
+      }
+    ).end(buffer);
+  });
+}
 
 /* -------------------------------------------
    GET ALL BOOKS WITH FILTERS + PAGINATION
@@ -125,12 +141,21 @@ router.post("/", authenticateToken, isAdmin, (req, res, next) => {
     let coverImage = cover_image;
     let previewImages = preview_images || [];
 
+    // Handle file uploads
     if (req.files) {
       if (req.files["coverImage"]) {
-        coverImage = req.files["coverImage"][0].path;
+        console.log('📤 Uploading cover image to Cloudinary...');
+        coverImage = await uploadToCloudinary(
+          req.files["coverImage"][0].buffer, 
+          req.files["coverImage"][0].originalname
+        );
       }
       if (req.files["previewImages"]) {
-        previewImages = req.files["previewImages"].map(f => f.path);
+        console.log('📤 Uploading preview images to Cloudinary...');
+        const uploadPromises = req.files["previewImages"].map(file => 
+          uploadToCloudinary(file.buffer, file.originalname)
+        );
+        previewImages = await Promise.all(uploadPromises);
       }
     }
 
@@ -194,11 +219,20 @@ router.put("/:id", authenticateToken, isAdmin, (req, res, next) => {
       book.preview_images = req.body.preview_images;
     }
 
+    // Handle file uploads for updates
     if (req.files && req.files["coverImage"]) {
-      book.cover_image = req.files["coverImage"][0].path;
+      console.log('📤 Uploading new cover image to Cloudinary...');
+      book.cover_image = await uploadToCloudinary(
+        req.files["coverImage"][0].buffer, 
+        req.files["coverImage"][0].originalname
+      );
     }
     if (req.files && req.files["previewImages"]) {
-      book.preview_images = req.files["previewImages"].map(f => f.path);
+      console.log('📤 Uploading new preview images to Cloudinary...');
+      const uploadPromises = req.files["previewImages"].map(file => 
+        uploadToCloudinary(file.buffer, file.originalname)
+      );
+      book.preview_images = await Promise.all(uploadPromises);
     }
 
     await book.save();
