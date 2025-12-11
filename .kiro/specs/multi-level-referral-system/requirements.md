@@ -131,6 +131,32 @@ This document specifies the requirements for a multi-level referral commission s
 
 ### Requirement 10
 
+**User Story:** As a platform administrator, I want users who sign up without a referral code to still be integrated into the referral tree system, so that the platform can benefit from their future referrals while supporting development through their direct commissions.
+
+#### Acceptance Criteria
+
+1. WHEN a user signs up without a referral code THEN the system SHALL still place them in the referral tree structure
+2. WHEN a user without a referrer is placed in the tree THEN the system SHALL use the same serial placement algorithm to find their position
+3. WHEN a user without a referrer makes a purchase THEN the system SHALL allocate their 3% direct commission to the Trust Fund
+4. WHEN a user without a referrer refers others THEN the system SHALL process their referrals normally and they SHALL earn commissions from their referrals
+5. WHEN calculating tree commissions for a purchase by a user without a referrer THEN the system SHALL distribute tree commissions normally to their tree parents
+
+### Requirement 11
+
+**User Story:** As a platform administrator, I want to view the complete referral tree structure in a visual format, so that I can monitor how the tree is filling level by level and understand the overall network growth.
+
+#### Acceptance Criteria
+
+1. WHEN an administrator requests the complete referral tree THEN the system SHALL display all users organized in their tree structure
+2. WHEN displaying the complete tree THEN the system SHALL show each user's position, level, and referral relationships
+3. WHEN viewing the tree structure THEN the system SHALL highlight users who joined without referral codes
+4. WHEN displaying tree levels THEN the system SHALL show how each level is filling up (e.g., "Level 2: 15/25 positions filled")
+5. WHEN viewing the tree THEN the system SHALL provide filtering options by level, join date, or referral status
+6. WHEN the tree becomes large THEN the system SHALL provide pagination or collapsible sections for better navigation
+7. WHEN viewing individual nodes THEN the system SHALL show user details like join date, total referrals, and commission earned
+
+### Requirement 12
+
 **User Story:** As a developer, I want the referral tree placement algorithm to be deterministic and consistent, so that users are placed correctly every time.
 
 #### Acceptance Criteria

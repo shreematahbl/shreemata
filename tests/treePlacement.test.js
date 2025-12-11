@@ -202,4 +202,51 @@ describe('Tree Placement Service', () => {
       { numRuns: 100 }
     );
   });
+
+  /**
+   * Feature: multi-level-referral-system, Property 12: No-referrer tree placement
+   * Validates: Requirements 10.1, 10.2
+   * 
+   * For any user who signs up without a referral code, they should still be placed
+   * in the referral tree using the same serial placement algorithm.
+   */
+  it('Property 12: No-referrer tree placement', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 0, max: 4 }), // Number of children root has (0-4)
+        async (numRootChildren) => {
+          const referenceUserId = 'reference123';
+          const rootUserId = 'root123';
+          
+          // Create children IDs
+          const childrenIds = Array.from({ length: numRootChildren }, (_, i) => `child${i}`);
+          
+          // Setup simple mock - reference user is always root for simplicity
+          User.findById.mockResolvedValue({
+            _id: rootUserId,
+            treeLevel: 1,
+            treeParent: null,
+            treeChildren: childrenIds
+          });
+
+          // Find placement for user without referrer
+          const placement = await findTreePlacement(referenceUserId);
+
+          // Verify placement follows same algorithm as referred users
+          expect(placement).toHaveProperty('parentId');
+          expect(placement).toHaveProperty('level');
+          expect(placement).toHaveProperty('position');
+          
+          // Since root has < 5 children, should be placed directly under root
+          expect(placement.parentId).toBe(rootUserId);
+          expect(placement.level).toBe(2); // Root level + 1
+          expect(placement.position).toBe(numRootChildren); // Next available position
+          
+          // Reset for next iteration
+          jest.clearAllMocks();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
 });

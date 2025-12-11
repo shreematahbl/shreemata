@@ -149,6 +149,9 @@ New model to track trust fund balances and transactions:
 #### Admin Endpoints
 - `GET /api/admin/trust-funds` - Get trust fund balances and history
 - `GET /api/admin/referral-analytics` - Get system-wide referral analytics
+- `GET /api/admin/referral-tree/complete` - Get complete referral tree structure for admin view
+- `GET /api/admin/referral-tree/level/:level` - Get specific level of referral tree
+- `GET /api/admin/referral-tree/stats` - Get tree statistics (levels, fill rates, growth metrics)
 - `POST /api/admin/trust-funds/withdraw` - Withdraw from trust funds
 - `GET /api/admin/commission-report` - Generate commission reports
 
@@ -505,41 +508,65 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
 *For any* direct commission calculated, the direct referrer's wallet balance should increase by exactly the commission amount.
 **Validates: Requirements 4.3**
 
-### Property 8: Tree commission halving
+### Property 8: No-referrer commission allocation
+*For any* order where the purchaser has no direct referrer, the 3% direct commission should be allocated to the Trust Fund.
+**Validates: Requirements 4.4, 10.3**
+
+### Property 9: Tree commission halving
 *For any* sequence of tree commission calculations, each level's commission percentage should be exactly half of the previous level's percentage (1.5%, 0.75%, 0.375%, etc.).
 **Validates: Requirements 5.5**
 
-### Property 9: Tree commission upper bound
+### Property 10: Tree commission upper bound
 *For any* order's tree commission distribution, the sum of all tree commissions should never exceed 3% of the order amount.
 **Validates: Requirements 5.6**
 
-### Property 10: Remainder allocation
+### Property 11: Remainder allocation
 *For any* order where tree commissions sum to less than 3% and no more tree parents exist, the remainder should be allocated to the Development Trust Fund.
 **Validates: Requirements 5.7**
 
-### Property 11: Trust fund balance consistency
+### Property 12: No-referrer tree placement
+*For any* user who signs up without a referral code, they should still be placed in the referral tree using the same serial placement algorithm.
+**Validates: Requirements 10.1, 10.2**
+
+### Property 13: No-referrer referral capability
+*For any* user without a referrer who refers others, they should earn commissions normally from their referrals.
+**Validates: Requirements 10.4**
+
+### Property 14: Trust fund balance consistency
 *For any* trust fund (Trust or Development), the balance should equal the sum of all transaction amounts in its transaction history.
 **Validates: Requirements 6.1, 6.2**
 
-### Property 12: Trust fund transaction completeness
+### Property 15: Trust fund transaction completeness
 *For any* allocation to a trust fund, a transaction record must be created containing timestamp, amount, and source order reference.
 **Validates: Requirements 6.5**
 
-### Property 13: Tree query completeness
+### Property 16: Tree query completeness
 *For any* user, querying their referral tree should return all users where that user is recorded as the tree parent.
 **Validates: Requirements 7.1**
 
-### Property 14: Tree level accuracy
+### Property 17: Tree level accuracy
 *For any* user in the tree, their tree level should equal their tree parent's level plus one.
 **Validates: Requirements 7.3**
 
-### Property 15: Dual relationship tracking
-*For any* referee placed in the tree, both their direct referrer (referredBy) and tree parent (treeParent) relationships must be recorded.
-**Validates: Requirements 10.3**
+### Property 18: Dual relationship tracking
+*For any* referee placed in the tree, both their direct referrer (referredBy) and tree parent (treeParent) relationships must be recorded, with referredBy being null for users without referrers.
+**Validates: Requirements 11.3**
 
-### Property 16: Timestamp-based ordering
+### Property 19: Complete tree query accuracy
+*For any* admin request for the complete referral tree, the returned structure should include all users with their correct tree positions and relationships.
+**Validates: Requirements 11.1, 11.2**
+
+### Property 20: Tree level capacity calculation
+*For any* tree level, the system should accurately calculate and display the current fill status (occupied positions / total possible positions).
+**Validates: Requirements 11.4**
+
+### Property 21: No-referrer user identification
+*For any* user who joined without a referral code, they should be clearly identifiable in the admin tree view.
+**Validates: Requirements 11.3**
+
+### Property 22: Timestamp-based ordering
 *For any* set of referrals under the same parent, their tree positions should correspond to their chronological order of creation based on timestamps.
-**Validates: Requirements 10.2**
+**Validates: Requirements 12.2**
 
 ## Error Handling
 

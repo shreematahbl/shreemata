@@ -27,13 +27,20 @@ const authenticateToken = async (req, res, next) => {
 
     req.user = {
       id: user._id,
+      name: user.name,
       email: user.email,
       role: user.role
     };
 
     next();
   } catch (err) {
-    console.error("Auth error:", err);
+    // Audit log for authentication failures
+    console.log(`🚨 SECURITY AUDIT: Authentication failure at ${new Date().toISOString()}`);
+    console.log(`   Attempted endpoint: ${req.method} ${req.originalUrl}`);
+    console.log(`   IP: ${req.ip || req.connection.remoteAddress}`);
+    console.log(`   User Agent: ${req.get('User-Agent')}`);
+    console.log(`   Error: ${err.message}`);
+    
     return res.status(401).json({ error: "Unauthorized" });
   }
 };
@@ -43,6 +50,12 @@ const authenticateToken = async (req, res, next) => {
 // ----------------------------------------------
 const isAdmin = (req, res, next) => {
   if (req.user.role !== "admin") {
+    // Audit log for unauthorized access attempt
+    console.log(`🚨 SECURITY AUDIT: Unauthorized admin access attempt by user ${req.user.email} (ID: ${req.user.id}) at ${new Date().toISOString()}`);
+    console.log(`   Attempted endpoint: ${req.method} ${req.originalUrl}`);
+    console.log(`   IP: ${req.ip || req.connection.remoteAddress}`);
+    console.log(`   User Agent: ${req.get('User-Agent')}`);
+    
     return res.status(403).json({ error: "Admin access only" });
   }
   next();

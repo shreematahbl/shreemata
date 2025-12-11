@@ -385,3 +385,205 @@
 
 
   - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 15. Implement no-referrer user handling
+
+
+
+
+
+
+  - [x] 15.1 Update signup endpoint for users without referral codes
+
+
+
+
+    - Modify signup to handle missing/empty referral code
+    - Still place user in tree using same placement algorithm
+    - Set referredBy to null but assign treeParent normally
+    - _Requirements: 10.1, 10.2_
+  
+  - [x] 15.2 Write property test for no-referrer tree placement
+
+
+    - **Property 12: No-referrer tree placement**
+    - **Validates: Requirements 10.1, 10.2**
+  
+  - [x] 15.3 Write property test for no-referrer referral capability
+
+
+    - **Property 13: No-referrer referral capability**
+    - **Validates: Requirements 10.4**
+
+- [x] 16. Update commission distribution for no-referrer users
+
+
+
+
+
+  - [x] 16.1 Modify commission calculation for users without referrers
+
+
+    - When purchaser has referredBy = null, allocate 3% direct commission to Trust Fund
+    - Tree commissions should still work normally for their tree parents
+    - Update CommissionTransaction to handle null directReferrer
+    - _Requirements: 10.3, 10.5_
+  
+  - [x] 16.2 Write property test for no-referrer commission allocation
+
+
+    - **Property 8: No-referrer commission allocation**
+    - **Validates: Requirements 4.4, 10.3**
+
+- [x] 17. Create admin referral tree visualization
+
+
+
+
+
+  - [x] 17.1 Implement GET /api/admin/referral-tree/complete endpoint
+
+
+    - Build complete tree structure starting from root users
+    - Include user details (name, join date, referral status, commissions)
+    - Highlight users who joined without referral codes
+    - Implement pagination for large trees
+    - _Requirements: 11.1, 11.2, 11.3_
+  
+  - [x] 17.2 Implement GET /api/admin/referral-tree/level/:level endpoint
+
+
+    - Return all users at specific tree level
+    - Show fill status for that level (occupied/total positions)
+    - Include user details and referral relationships
+    - _Requirements: 11.4_
+  
+  - [x] 17.3 Implement GET /api/admin/referral-tree/stats endpoint
+
+
+    - Calculate tree statistics (total levels, users per level, fill rates)
+    - Show growth metrics and trends
+    - Include no-referrer user statistics
+    - _Requirements: 11.4_
+  
+  - [x] 17.4 Write property test for complete tree query accuracy
+
+
+    - **Property 19: Complete tree query accuracy**
+    - **Validates: Requirements 11.1, 11.2**
+  
+  - [x] 17.5 Write property test for tree level capacity calculation
+
+
+    - **Property 20: Tree level capacity calculation**
+    - **Validates: Requirements 11.4**
+  
+  - [x] 17.6 Write property test for no-referrer user identification
+
+
+
+    - **Property 21: No-referrer user identification**
+    - **Validates: Requirements 11.3**
+
+- [x] 18. Create admin tree visualization frontend
+
+
+
+
+
+  - [x] 18.1 Create admin tree view page
+
+
+    - Build interactive tree visualization component
+    - Show level-by-level view with fill status
+    - Highlight users without referrers with different styling
+    - Add filtering options (level, join date, referral status)
+    - _Requirements: 11.1, 11.2, 11.3, 11.5_
+  
+  - [x] 18.2 Add tree statistics dashboard
+
+
+    - Display tree growth metrics and trends
+    - Show fill rates for each level
+    - Include charts for visual representation
+    - Add export functionality for reports
+    - _Requirements: 11.4_
+  
+  - [x] 18.3 Add user detail modals in tree view
+
+
+    - Show detailed user information on click
+    - Display join date, total referrals, commission earned
+    - Show referral path and tree position
+    - _Requirements: 11.7_
+ 
+- [-] 19. Update existing referral endpoints for no-referrer users
+
+
+  - [x] 19.1 Update GET /api/referral/details endpoint
+
+
+    - Handle users with referredBy = null
+    - Show appropriate messaging for users without referrers
+    - Display tree position and referral capabilities
+    - _Requirements: 10.4_
+  
+  - [x] 19.2 Update referral tree visualization for regular users
+
+
+    - Show if user joined without referrer
+    - Display tree position and parent information
+    - Highlight their referral network growth
+    - _Requirements: 10.4_
+
+- [ ] 20. Add admin navigation and permissions
+
+
+
+
+
+  - [x] 20.1 Add admin tree view to navigation
+
+
+    - Add menu item for "Referral Tree" in admin panel
+    - Ensure proper admin authentication
+    - Add breadcrumbs and navigation helpers
+    - _Requirements: 11.1_
+  
+  - [x] 20.2 Implement admin-only access controls
+
+
+    - Restrict tree visualization endpoints to admin users
+    - Add proper error handling for unauthorized access
+    - Log admin access for audit purposes
+    - _Requirements: 11.1_
+
+- [x] 21. Update data migration for no-referrer handling
+
+
+
+
+
+  - [x] 21.1 Update existing user migration
+
+
+    - Handle existing users who may not have referrers
+    - Ensure all users have proper tree placement
+    - Backfill tree structure for users without referredBy
+    - _Requirements: 10.1, 10.2_
+  
+  - [x] 21.2 Update commission recalculation migration
+
+
+    - Recalculate commissions for users without referrers
+    - Ensure Trust Fund gets appropriate allocations
+    - Update CommissionTransaction records accordingly
+    - _Requirements: 10.3_
+- [ ] 22. Final checkpoint - Ensure all tests pass
+
+
+
+
+- [ ] 22. Final checkpoint - Ensure all tests pass
+
+  - Ensure all tests pass, ask the user if questions arise.

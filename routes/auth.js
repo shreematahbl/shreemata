@@ -54,7 +54,7 @@ router.post("/signup", async (req, res) => {
       throw new Error("Unable to generate unique referral code");
     }
 
-    // Handle tree placement if user was referred
+    // Handle tree placement for all users (with or without referrer)
     let treePlacementData = {
       treeParent: null,
       treeLevel: 1, // Root level for users without referrer
@@ -97,6 +97,26 @@ router.post("/signup", async (req, res) => {
           code: "TREE_PLACEMENT_ERROR",
           details: error.message 
         });
+      }
+    } else {
+      // For users without referrer, still place them in the tree using the same algorithm
+      // Find any existing user to use as a reference point for tree placement
+      try {
+        const anyExistingUser = await User.findOne({ treeLevel: { $gte: 1 } }).sort({ createdAt: 1 });
+        
+        if (anyExistingUser) {
+          // Use the tree placement algorithm starting from any existing user
+          const placement = await findTreePlacement(anyExistingUser._id);
+          treePlacementData = {
+            treeParent: placement.parentId,
+            treeLevel: placement.level,
+            treePosition: placement.position
+          };
+        }
+        // If no existing users, keep default root level placement
+      } catch (error) {
+        console.error("Tree placement error for no-referrer user:", error);
+        // Keep default root level placement if tree placement fails
       }
     }
 
@@ -145,8 +165,10 @@ router.post("/signup", async (req, res) => {
       directReferrer.referrals += 1;
       await directReferrer.save();
       console.log(`Referral count incremented for ${directReferrer.email}: ${directReferrer.referrals}`);
+    }
 
-      // Add new user to tree parent's children array
+    // Add new user to tree parent's children array (for both referred and non-referred users)
+    if (treePlacementData.treeParent) {
       const treeParent = await User.findById(treePlacementData.treeParent);
       if (treeParent) {
         treeParent.treeChildren.push(newUser._id);

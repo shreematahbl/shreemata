@@ -31,6 +31,9 @@ async function buildTreeFromChildren(userId, directReferrerCode, currentDepth = 
     for (const child of user.treeChildren) {
         // Determine if this is a direct referral or spillover placement
         const isDirectReferral = child.referredBy === directReferrerCode;
+        
+        // Check if child joined without a referrer
+        const hasReferrer = child.referredBy !== null && child.referredBy !== undefined;
 
         const subtree = await buildTreeFromChildren(
             child._id, 
@@ -47,6 +50,8 @@ async function buildTreeFromChildren(userId, directReferrerCode, currentDepth = 
             level: child.treeLevel,
             isDirectReferral: isDirectReferral,
             placementType: isDirectReferral ? 'direct' : 'spillover',
+            hasReferrer: hasReferrer,
+            joinedWithoutReferrer: !hasReferrer,
             children: subtree
         });
     }
@@ -88,7 +93,8 @@ async function buildTree(referralCode) {
 router.get("/tree", authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user.id)
-            .select("name referralCode wallet treeLevel treeChildren");
+            .select("name referralCode wallet treeLevel treeChildren referredBy treeParent")
+            .populate('treeParent', 'name referralCode treeLevel');
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });
@@ -105,14 +111,44 @@ router.get("/tree", authenticateToken, async (req, res) => {
             maxDepth
         );
 
+        // Check if current user joined without a referrer
+        const hasReferrer = user.referredBy !== null && user.referredBy !== undefined;
+
+        // Tree position information
+        const treePosition = {
+            hasReferrer: hasReferrer,
+            joinedWithoutReferrer: !hasReferrer,
+            treeParent: user.treeParent ? {
+                id: user.treeParent._id,
+                name: user.treeParent.name,
+                referralCode: user.treeParent.referralCode,
+                level: user.treeParent.treeLevel
+            } : null,
+            message: hasReferrer 
+                ? `You were referred by ${user.referredBy} and placed in the tree`
+                : "You joined without a referrer but were placed in the tree to enable your referral network growth"
+        };
+
+        // Calculate referral network growth statistics
+        const networkStats = {
+            totalTreeChildren: tree.length,
+            directReferrals: tree.filter(child => child.isDirectReferral).length,
+            spilloverPlacements: tree.filter(child => !child.isDirectReferral).length,
+            childrenWithoutReferrers: tree.filter(child => child.joinedWithoutReferrer).length
+        };
+
         res.json({
             root: {
                 id: user._id,
                 name: user.name,
                 referralCode: user.referralCode,
                 wallet: user.wallet || 0,
-                level: user.treeLevel
+                level: user.treeLevel,
+                hasReferrer: hasReferrer,
+                joinedWithoutReferrer: !hasReferrer
             },
+            treePosition: treePosition,
+            networkStats: networkStats,
             children: tree,
             maxDepth: maxDepth
         });

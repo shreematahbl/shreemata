@@ -5,18 +5,18 @@ const User = require('../models/User');
  * Implements global breadth-first search with serial ordering based on timestamps
  * Always searches from the root of the tree to ensure balanced, level-by-level filling
  * 
- * @param {String} directReferrerId - The ID of the user who directly referred the new user
+ * @param {String} referenceUserId - The ID of a user to use as reference for finding the tree root
  * @returns {Object} Placement information: { parentId, level, position }
  */
-async function findTreePlacement(directReferrerId) {
-  const directReferrer = await User.findById(directReferrerId);
+async function findTreePlacement(referenceUserId) {
+  const referenceUser = await User.findById(referenceUserId);
   
-  if (!directReferrer) {
-    throw new Error('Direct referrer not found');
+  if (!referenceUser) {
+    throw new Error('Reference user not found');
   }
   
   // Find the root of the tree (user with treeLevel 1 or no treeParent)
-  let root = directReferrer;
+  let root = referenceUser;
   while (root.treeParent) {
     root = await User.findById(root.treeParent);
     if (!root) {

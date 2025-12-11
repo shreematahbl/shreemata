@@ -12,6 +12,9 @@ router.get("/details", authenticateToken, async (req, res) => {
             .populate('treeParent', 'name email referralCode')
             .populate('treeChildren', 'name email referralCode treeLevel');
 
+        // Check if user joined without a referrer
+        const hasReferrer = user.referredBy !== null && user.referredBy !== undefined;
+        
         // Tree placement information
         const treePlacement = {
             treeLevel: user.treeLevel,
@@ -85,11 +88,27 @@ router.get("/details", authenticateToken, async (req, res) => {
             placementType: child.referredBy === user.referralCode ? 'direct' : 'spillover'
         }));
 
+        // Referral status and messaging for no-referrer users
+        const referralStatus = {
+            hasReferrer: hasReferrer,
+            referrerCode: user.referredBy,
+            canRefer: true, // All users can refer others regardless of how they joined
+            message: hasReferrer 
+                ? `You joined using referral code: ${user.referredBy}` 
+                : "You joined without a referral code, but you can still refer others and earn commissions!",
+            directCommissionNote: hasReferrer 
+                ? "You earn 3% direct commission when your referrals make purchases"
+                : "When you make purchases, your 3% direct commission goes to the Trust Fund to support platform development"
+        };
+
         res.json({
             // Basic referral info
             referralCode: user.referralCode,
             wallet: user.wallet,
             referrals: user.referrals || 0,
+            
+            // Referral status and messaging
+            referralStatus: referralStatus,
             
             // Tree placement information
             treePlacement: treePlacement,

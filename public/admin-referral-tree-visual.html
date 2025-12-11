@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin — Referral Tree (Visual)</title>
+
+<!-- html2canvas for Export PNG -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style>
+/* --- base layout (kept your look & feel) --- */
+body {
+    background: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    color: #111;
+}
+.container {
+    max-width: 1400px;
+    margin: 24px auto;
+    padding: 20px;
+}
+.tree-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-top: 10px;
+    border: 1px solid #e6e6e6;
+}
+.tree-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+}
+.tree-header h2 { margin:0; font-size:20px; color:#131921; }
+.tree-controls { display:flex; gap:10px; align-items:center; }
+.tree-search {
+    padding: 8px 12px; border-radius:6px; border:1px solid #d0d0d0; width:260px; font-size:14px;
+}
+.btn-primary, .btn-secondary {
+    padding: 8px 14px; border-radius:6px; border:1px solid #d0d0d0; cursor:pointer; font-weight:600;
+    background:white; color:#333; font-size:14px;
+}
+.btn-secondary { background:#4a90e2; color:#fff; border-color:#4a90e2; }
+.btn-primary:hover { transform:translateY(-1px); }
+.btn-secondary:hover { transform:translateY(-1px); background:#357abd; border-color:#357abd; }
+
+/* tree visuals */
+.tree-root-wrap { padding: 20px 10px; overflow:auto; }
+.tree-level {
+    display:flex; flex-direction:column; align-items:center; position:relative; padding-top:14px;
+}
+.tree-level:before {
+    content:""; position:absolute; top:0; left:50%; width:1px; height:14px; background:#d0d0d0; transform:translateX(-50%);
+}
+.tree-level.root:before { display:none; }
+
+.tree-children {
+    display:flex; gap:18px; justify-content:center; margin-top:18px; position:relative;
+}
+.tree-children:before {
+    content:""; position:absolute; top:0; left:0; right:0; height:1px; background:#d0d0d0;
+}
+.tree-children > div { position:relative; }
+.tree-children > div:before {
+    content:""; position:absolute; top:-18px; left:50%; width:1px; height:18px; background:#d0d0d0; transform:translateX(-50%);
+}
+
+.tree-node {
+    background:#fff; border:1px solid #d0d0d0; padding:12px 14px; border-radius:8px; min-width:150px;
+    text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.06); cursor:pointer; transition:all .12s;
+}
+.tree-node:hover { transform:translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,0.08); border-color:#4a90e2; }
+.tree-name { font-weight:700; font-size:14px; margin-bottom:6px; color:#101010; }
+.tree-meta { font-size:12px; color:#666; margin-top:4px; }
+
+.highlight { box-shadow:0 0 0 4px rgba(74,144,226,0.12) !important; border-color:#4a90e2 !important; }
+
+/* loading / messages */
+#loading { padding:18px; text-align:center; color:#666; }
+.error { color:#a33; padding:10px; }
+
+/* modal */
+.modal-backdrop {
+    position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:2000;
+}
+.modal {
+    width:920px; max-width:95%; background:#fff; border-radius:8px; box-shadow:0 12px 36px rgba(0,0,0,0.25); padding:18px;
+}
+.modal .close { float:right; cursor:pointer; border:none; background:transparent; font-size:18px; }
+.modal .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:12px 0; }
+.stat-card { padding:12px; border-left:4px solid #667eea; background:#fafafa; border-radius:6px; }
+
+/* small screens */
+@media (max-width:600px){
+    .tree-children { gap:10px; flex-direction:column; align-items:center; }
+    .tree-children > div:before { display:none; }
+    .tree-level:before { display:none; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="tree-card">
+        <div class="tree-header">
+            <h2>Referral Tree (Visual)</h2>
+            <div class="tree-controls">
+                <input id="searchInput" class="tree-search" placeholder="Search user by name or code..." />
+                <button id="refreshBtn" class="btn-primary">Refresh</button>
+                <button id="exportBtn" class="btn-secondary">Export PNG</button>
+            </div>
+        </div>
+
+        <p style="color:#666; margin:8px 0 12px;">Displays your full referral network. Click a node to open details.</p>
+
+        <div id="loading">Loading referral tree…</div>
+        <div id="treeWrap" class="tree-root-wrap" style="display:none;"></div>
+        <div id="message" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- modal for user details -->
+<div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-hidden="true">
+    <div class="modal" role="document">
+        <button class="close" id="modalClose" aria-label="Close">&times;</button>
+        <div id="modalContent">
+            <!-- content inserted dynamically -->
+        </div>
+    </div>
+</div>
+
+<script>
+/*
+  Robust admin visual referral tree
+  - Attempts common endpoints
+  - Works with nested `tree` arrays or `root` + `children` form
+  - Uses current API base: window.API_URL (should be http://localhost:3000 or production host)
+  - Calls protected endpoints with Bearer token from localStorage
+*/
+
+// API base (expected provided by your config.js)
+const API = (typeof API_URL !== 'undefined') ? API_URL : ''; // user earlier indicated API_URL is http://localhost:3000
+
+// Candidate endpoints (tried in order)
+const ENDPOINT_CANDIDATES = [
+    `${API}/api/admin/referral-tree/complete`, // likely from your codebase
+    `${API}/api/referral/tree`,                // possibility from reference file you shared
+    `${API}/api/admin/referral-tree/complete?page=1&limit=1000`, // try large limit if paged
+];
+
+const treeWrap = document.getElementById('treeWrap');
+const loadingEl = document.getElementById('loading');
+const messageEl = document.getElementById('message');
+const searchInput = document.getElementById('searchInput');
+const refreshBtn = document.getElementById('refreshBtn');
+const exportBtn = document.getElementById('exportBtn');
+
+refreshBtn.addEventListener('click', loadTree);
+exportBtn.addEventListener('click', exportTreeAsImage);
+searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') performSearch(); });
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'modalBackdrop') closeModal(); });
+
+/* ---------- MAIN: loadTree tries endpoints until it gets usable data ---------- */
+async function loadTree(){
+    treeWrap.style.display = 'none';
+    messageEl.style.display = 'none';
+    loadingEl.style.display = 'block';
+    loadingEl.textContent = 'Loading referral tree…';
+    treeWrap.innerHTML = '';
+
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            loadingEl.textContent = 'Not authenticated. Redirecting to login…';
+            setTimeout(() => window.location.href = '/login.html', 900);
+            return;
+        }
+
+        let data = null;
+        let usedEndpoint = null;
+        // Try candidates sequentially
+        for (const ep of ENDPOINT_CANDIDATES) {
+            try {
+                const res = await fetch(ep, { headers: { 'Authorization': 'Bearer ' + token } });
+                if (!res.ok) {
+                    // Try next endpoint on 404,401,403 we still try others; but break on server 5xx?
+                    if (res.status >= 500) {
+                        // server error — stop trying other endpoints (they likely share same backend)
+                        throw new Error(`Server error ${res.status}`);
+                    }
+                    // try next candidate
+                    continue;
+                }
+                const json = await res.json();
+                if (json) { data = json; usedEndpoint = ep; break; }
+            } catch (err) {
+                // keep trying next endpoint
+                console.warn('Endpoint try failed:', ep, err);
+                continue;
+            }
+        }
+
+        loadingEl.style.display = 'none';
+
+        if (!data) {
+            messageEl.style.display = 'block';
+            messageEl.className = 'error';
+            messageEl.textContent = 'Could not load referral tree — no endpoint responded successfully. Check API_URL and backend routes.';
+            return;
+        }
+
+        // Normalize data to a root node or array of roots
+        let roots = [];
+        if (Array.isArray(data.tree)) {
+            // data.tree may be full nested tree (array)
+            roots = data.tree;
+        } else if (data.root) {
+            // legacy API: root + children
+            // some APIs return { root: {...}, children: [...] }
+            // we will attach children when building
+            roots = [ { ...data.root, children: data.children || (data.root.children || []) } ];
+        } else if (Array.isArray(data)) {
+            // in case API gave an array directly
+            roots = data;
+        } else {
+            // If object looks like single node
+            if (data.id || data._id) roots = [ data ];
+        }
+
+        if (!roots || roots.length === 0) {
+            messageEl.style.display = 'block';
+            messageEl.textContent = 'No referral records found.';
+            return;
+        }
+
+        // Build visible tree
+        treeWrap.innerHTML = '';
+        for (const r of roots) {
+            const el = buildTreeElement(r, true);
+            treeWrap.appendChild(el);
+        }
+        treeWrap.style.display = 'block';
+        // small delay to smooth UX
+        setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 100);
+
+    } catch (err) {
+        console.error('loadTree error', err);
+        loadingEl.style.display = 'none';
+        messageEl.style.display = 'block';
+        messageEl.className = 'error';
+        messageEl.textContent = 'Error loading tree: ' + (err.message || err);
+    }
+}
+
+/* ---------- Build DOM recursively ---------- */
+function buildTreeElement(node, isRoot=false){
+    // Node may have children property or nested children
+    const levelDiv = document.createElement('div');
+    levelDiv.className = 'tree-level' + (isRoot ? ' root' : '');
+
+    const userNode = createUserNodeElement(node);
+    levelDiv.appendChild(userNode);
+
+    const children = node.children || node.treeChildren || node.childrenList || [];
+    if (children && children.length > 0) {
+        const childrenWrap = document.createElement('div');
+        childrenWrap.className = 'tree-children';
+        children.forEach(child => {
+            const childTree = buildTreeElement(child, false);
+            childrenWrap.appendChild(childTree);
+        });
+        levelDiv.appendChild(childrenWrap);
+    }
+
+    return levelDiv;
+}
+
+function createUserNodeElement(user){
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+    node.setAttribute('data-user-id', user.id || user._id || user._id_str || '');
+    // safe content
+    const name = escapeHtml(user.name || user.fullName || user.displayName || 'Unnamed');
+    const wallet = Number(user.wallet || (user.account?.wallet) || 0).toFixed(2);
+    const referrals = (user.referrals !== undefined) ? user.referrals : (user.childrenCount || (user.relationships && user.relationships.treeChildrenCount) || 0);
+
+    node.innerHTML = `
+        <div class="tree-name">${name}</div>
+        <div class="tree-meta">Wallet: ₹${wallet}</div>
+        <div class="tree-meta">${referrals} referrals</div>
+    `;
+
+    // click opens modal (non-blocking)
+    node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const uid = node.getAttribute('data-user-id');
+        openUserModal(uid, user); // pass current minimal user object as fallback
+    });
+
+    return node;
+}
+
+/* ---------- Modal / user details ---------- */
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalContent = document.getElementById('modalContent');
+
+function openUserModal(userId, fallbackUser){
+    // Show modal quickly with fallback content, then fetch details
+    modalBackdrop.style.display = 'flex';
+    modalBackdrop.setAttribute('aria-hidden', 'false');
+    modalContent.innerHTML = `<div style="padding:12px;">Loading user details…</div>`;
+
+    // If no ID or empty, show fallback
+    if (!userId) {
+        populateModalWithData(fallbackUser || { name: 'Unknown' });
+        return;
+    }
+    fetchAndPopulateUser(userId, fallbackUser);
+}
+
+async function fetchAndPopulateUser(userId, fallbackUser){
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) { populateModalWithData({ name: 'Not authenticated' }); return; }
+
+        // Try likely user endpoints
+        const userEndpoints = [
+            `${API}/api/admin/users/${userId}`,
+            `${API}/api/admin/users/user/${userId}`,
+            `${API}/api/users/${userId}`
+        ];
+
+        let userData = null;
+        for (const ep of userEndpoints) {
+            try {
+                const res = await fetch(ep, { headers: { 'Authorization': 'Bearer ' + token, 'Content-Type':'application/json' } });
+                if (!res.ok) continue;
+                const json = await res.json();
+                // Accept { user: {...} } or {...}
+                if (json.user) userData = json.user;
+                else userData = json;
+                break;
+            } catch(err) {
+                continue;
+            }
+        }
+
+        if (!userData) {
+            // fallback to minimal
+            populateModalWithData(fallbackUser || { name: 'No details available' });
+            return;
+        }
+
+        populateModalWithData(userData);
+
+    } catch (err) {
+        console.error('fetchAndPopulateUser', err);
+        populateModalWithData(fallbackUser || { name: 'Error loading details' });
+    }
+}
+
+function populateModalWithData(user) {
+    const joinDate = user.joinDate ? (new Date(user.joinDate)).toLocaleDateString() : 'N/A';
+    const wallet = Number(user.wallet || 0).toFixed(2);
+    const totalComms = Number(user.commissions?.total || user.totalCommissions || 0).toFixed(2);
+    const referrals = user.referrals ?? user.childrenCount ?? (user.relationships?.treeChildrenCount ?? 0);
+
+    modalContent.innerHTML = `
+        <button class="close" id="modalCloseInner" aria-label="Close">&times;</button>
+        <h3 style="margin-top:6px;">${escapeHtml(user.name || user.fullName || 'User')}</h3>
+        <div class="stat-grid">
+            <div class="stat-card"><strong>Wallet</strong><div>₹${wallet}</div></div>
+            <div class="stat-card"><strong>Total Commissions</strong><div>₹${totalComms}</div></div>
+            <div class="stat-card"><strong>Direct Children</strong><div>${referrals}</div></div>
+            <div class="stat-card"><strong>Joined</strong><div>${joinDate}</div></div>
+        </div>
+        <div style="margin-top:8px;">
+            <strong>Email:</strong> ${escapeHtml(user.email || 'N/A')}<br/>
+            <strong>Referral Code:</strong> ${escapeHtml(user.referralCode || user.code || 'N/A')}<br/>
+            <strong>Role:</strong> ${escapeHtml(user.role || 'User')}
+        </div>
+    `;
+    // wire inner close
+    const innerClose = document.getElementById('modalCloseInner');
+    if (innerClose) innerClose.addEventListener('click', closeModal);
+}
+
+/* ---------- search ---------- */
+function performSearch(){
+    const q = (searchInput.value || '').trim().toLowerCase();
+    if (!q) return;
+
+    // Clear previous highlights
+    document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('highlight'));
+
+    // Find first node whose text matches name/code
+    let found = null;
+    document.querySelectorAll('.tree-node').forEach(node => {
+        const txt = (node.textContent || '').toLowerCase();
+        if (found) return;
+        if (txt.includes(q)) found = node;
+    });
+
+    if (found) {
+        found.classList.add('highlight');
+        // ensure it's visible
+        found.scrollIntoView({ behavior:'smooth', block:'center' });
+        // remove highlight after a bit
+        setTimeout(() => found.classList.remove('highlight'), 4000);
+    } else {
+        alert('No matching user found in currently loaded tree.');
+    }
+}
+
+/* ---------- export ---------- */
+async function exportTreeAsImage(){
+    // temporarily remove overflow to get full width
+    const el = treeWrap;
+    if (!el || el.style.display === 'none') {
+        alert('Nothing to export.');
+        return;
+    }
+    try {
+        // Use html2canvas to create PNG
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null });
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `referral-tree-${new Date().toISOString().split('T')[0]}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } catch (err) {
+        console.error('Export failed', err);
+        // fallback to print
+        if (confirm('Failed to export image. Use print dialog as fallback?')) {
+            window.print();
+        }
+    }
+}
+
+/* ---------- helpers ---------- */
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+}
+
+function closeModal(){
+    modalBackdrop.style.display = 'none';
+    modalBackdrop.setAttribute('aria-hidden', 'true');
+}
+
+/* ---------- initialization ---------- */
+loadTree();
+
+</script>
+</body>
+</html>

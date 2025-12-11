@@ -116,7 +116,16 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
       throw new Error('Direct commission amount cannot be negative');
     }
 
-    if (purchaser.referredBy) {
+    // Handle users without referrers (referredBy = null)
+    if (purchaser.referredBy === null || purchaser.referredBy === undefined || purchaser.referredBy === '') {
+      // User has no referrer, allocate 3% direct commission to Trust Fund
+      console.log('User has no referrer (referredBy = null), allocating direct commission to Trust Fund');
+      await addToTrustFund('trust', directCommission, orderId, 'order_allocation', 'Direct commission - no referrer user', session);
+      transaction.trustFundAmount += directCommission;
+      transaction.directReferrer = null; // Explicitly set to null
+      transaction.directCommissionAmount = directCommission; // Still record the amount for tracking
+    } else {
+      // User has a referral code, try to find the referrer
       const directReferrer = await User.findOne({ referralCode: purchaser.referredBy }).session(session);
       
       if (directReferrer) {
@@ -143,16 +152,13 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
           console.log(`Direct commission of ${directCommission} credited to ${directReferrer.email}`);
         }
       } else {
-        // No direct referrer found, allocate to Trust Fund
+        // Referral code exists but referrer not found, allocate to Trust Fund
         console.log(`Direct referrer not found for code ${purchaser.referredBy}, allocating to Trust Fund`);
-        await addToTrustFund('trust', directCommission, orderId, 'order_allocation', 'Direct commission - no referrer', session);
+        await addToTrustFund('trust', directCommission, orderId, 'order_allocation', 'Direct commission - referrer not found', session);
         transaction.trustFundAmount += directCommission;
+        transaction.directReferrer = null;
+        transaction.directCommissionAmount = directCommission;
       }
-    } else {
-      // No referral code used, allocate to Trust Fund
-      console.log('No referral code used, allocating direct commission to Trust Fund');
-      await addToTrustFund('trust', directCommission, orderId, 'order_allocation', 'Direct commission - no referrer', session);
-      transaction.trustFundAmount += directCommission;
     }
     
     // 3. Calculate Development Trust Fund (dynamic %, will be added later with remainder)
@@ -271,8 +277,11 @@ async function distributeCommissions(orderId, purchaserId, orderAmount) {
     }
     
     // Verify total allocation equals 10%
+    // Note: For no-referrer users, directCommissionAmount is included in trustFundAmount,
+    // so we only count it separately if there's an actual directReferrer
+    const directCommissionToCount = transaction.directReferrer ? transaction.directCommissionAmount : 0;
     const totalAllocated = transaction.trustFundAmount + 
-                          transaction.directCommissionAmount + 
+                          directCommissionToCount + 
                           transaction.devTrustFundAmount + 
                           transaction.treeCommissions.reduce((sum, tc) => sum + tc.amount, 0) +
                           (transaction.remainderToDevFund || 0);

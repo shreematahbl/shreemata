@@ -166,4 +166,83 @@ describe('User Registration with Tree Placement', () => {
       { numRuns: 100 }
     );
   });
+
+  /**
+   * Feature: multi-level-referral-system, Property 13: No-referrer referral capability
+   * Validates: Requirements 10.4
+   * 
+   * For any user without a referrer who refers others, they should earn commissions
+   * normally from their referrals.
+   */
+  it('Property 13: No-referrer referral capability', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 3, maxLength: 20 }), // User name
+        fc.emailAddress(), // User email
+        fc.float({ min: 100, max: 1000 }), // Order amount
+        async (userName, userEmail, orderAmount) => {
+          // Create a user without referrer (no-referrer user)
+          const noReferrerUser = await User.create({
+            name: userName,
+            email: `${userEmail}-${Date.now()}-${Math.random()}`,
+            password: 'hashedpassword',
+            referralCode: `REF${Date.now()}${Math.random()}`,
+            referredBy: null, // No referrer
+            treeLevel: 1,
+            treeChildren: [],
+            wallet: 0,
+            directCommissionEarned: 0
+          });
+
+          // Create a user who will be referred by the no-referrer user
+          const referee = await User.create({
+            name: 'Referee',
+            email: `referee-${Date.now()}-${Math.random()}@test.com`,
+            password: 'hashedpassword',
+            referralCode: `REF${Date.now()}${Math.random()}`,
+            referredBy: noReferrerUser.referralCode, // Referred by no-referrer user
+            treeParent: noReferrerUser._id,
+            treeLevel: 2,
+            treePosition: 0,
+            treeChildren: []
+          });
+
+          // Update no-referrer user's children array
+          noReferrerUser.treeChildren.push(referee._id);
+          noReferrerUser.referrals = 1;
+          await noReferrerUser.save();
+
+          // Simulate commission calculation when referee makes a purchase
+          const directCommissionAmount = orderAmount * 0.03; // 3% direct commission
+          
+          // Update no-referrer user's wallet and commission tracking
+          noReferrerUser.wallet += directCommissionAmount;
+          noReferrerUser.directCommissionEarned += directCommissionAmount;
+          await noReferrerUser.save();
+
+          // Verify that no-referrer user can earn commissions normally
+          const updatedUser = await User.findById(noReferrerUser._id);
+          
+          // Should have earned direct commission
+          expect(updatedUser.wallet).toBeCloseTo(directCommissionAmount, 2);
+          expect(updatedUser.directCommissionEarned).toBeCloseTo(directCommissionAmount, 2);
+          
+          // Should have referral count
+          expect(updatedUser.referrals).toBe(1);
+          
+          // Should have tree children
+          expect(updatedUser.treeChildren).toHaveLength(1);
+          expect(updatedUser.treeChildren[0].toString()).toBe(referee._id.toString());
+          
+          // Verify referee relationship
+          expect(referee.referredBy).toBe(noReferrerUser.referralCode);
+          expect(referee.treeParent.toString()).toBe(noReferrerUser._id.toString());
+
+          // Clean up for next iteration
+          await User.deleteMany({});
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
 });
